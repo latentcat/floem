@@ -10,11 +10,11 @@ use crate::{
     message::UpdateMessage,
     prop_extractor,
     style::{
-        Background, BorderBottomColor, BorderBottomLeftRadius, BorderBottomRightRadius,
-        BorderLeftColor, BorderRightColor, BorderTopColor, BorderTopLeftRadius,
-        BorderTopRightRadius, BoxShadowProp, CursorStyle, InheritedInteractionCx, LayoutProps,
-        Outline, OutlineColor, Style, StyleClassRef, StyleSelectors, TransformProps,
-        recalc::StyleReason,
+        BackdropBlur, Background, BorderBottomColor, BorderBottomLeftRadius,
+        BorderBottomRightRadius, BorderLeftColor, BorderRightColor, BorderTopColor,
+        BorderTopLeftRadius, BorderTopRightRadius, BoxShadowProp, CornerSmoothing, CursorStyle,
+        InheritedInteractionCx, LayoutProps, Outline, OutlineColor, Style, StyleClassRef,
+        StyleSelectors, TransformProps, recalc::StyleReason,
     },
     view::LayoutTree,
 };
@@ -93,6 +93,8 @@ prop_extractor! {
         pub border_right_color: BorderRightColor,
         pub border_bottom_color: BorderBottomColor,
         pub background: Background,
+        pub backdrop_blur: BackdropBlur,
+        pub corner_smoothing: CornerSmoothing,
         pub shadow: BoxShadowProp,
     }
 }

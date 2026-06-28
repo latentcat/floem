@@ -68,6 +68,9 @@ use crate::{
     Renderer,
     context::{EventCx, PaintCx, StyleCx, UpdateCx},
     event::EventPropagation,
+    paint::corners::{
+        continuous_rounded_rect_path, normalized_corner_smoothing, should_use_continuous_corners,
+    },
     style::{LayoutProps, Style, StyleClassRef},
     unit::Length,
     views::{
@@ -1173,16 +1176,31 @@ fn border_to_radii_view(
 
 pub(crate) fn paint_bg(cx: &mut PaintCx, style: &ViewStyleProps, rect: Rect) {
     let radii = border_to_radii_view(style, rect.size(), &cx.font_size_cx);
+    let corner_smoothing = normalized_corner_smoothing(style.corner_smoothing());
+    let backdrop_blur = style
+        .backdrop_blur()
+        .resolve(rect.size().min_side(), &cx.font_size_cx);
     if radii_max(radii) > 0.0 {
-        paint_box_shadow(cx, style, rect, Some(radii));
+        paint_box_shadow(cx, style, rect, Some(radii), corner_smoothing);
+        if backdrop_blur > 0.0 {
+            cx.draw_backdrop_blur(rect, backdrop_blur, radii_max(radii));
+        }
         let bg = match style.background() {
             Some(color) => color,
             None => return,
         };
-        let rounded_rect = rect.to_rounded_rect(radii);
-        cx.fill(&rounded_rect, &bg, 0.0);
+        if should_use_continuous_corners(radii, corner_smoothing) {
+            let path = continuous_rounded_rect_path(rect, radii, corner_smoothing);
+            cx.fill(&path, &bg, 0.0);
+        } else {
+            let rounded_rect = rect.to_rounded_rect(radii);
+            cx.fill(&rounded_rect, &bg, 0.0);
+        }
     } else {
-        paint_box_shadow(cx, style, rect, None);
+        paint_box_shadow(cx, style, rect, None, corner_smoothing);
+        if backdrop_blur > 0.0 {
+            cx.draw_backdrop_blur(rect, backdrop_blur, 0.0);
+        }
         let bg = match style.background() {
             Some(color) => color,
             None => return,
@@ -1196,6 +1214,7 @@ fn paint_box_shadow(
     style: &ViewStyleProps,
     rect: Rect,
     rect_radius: Option<RoundedRectRadii>,
+    corner_smoothing: f64,
 ) {
     for shadow in &style.shadow() {
         let min = rect.size().min_side();
@@ -1213,14 +1232,21 @@ fn paint_box_shadow(
         );
         let rect = rect.inflate(spread, spread).inset(inset);
         if let Some(radii) = rect_radius {
-            let rounded_rect = RoundedRect::from_rect(rect, radii_add(radii, spread));
-            cx.fill(&rounded_rect, shadow.color, blur_radius);
+            let radii = radii_add(radii, spread);
+            if should_use_continuous_corners(radii, corner_smoothing) && blur_radius == 0.0 {
+                let path = continuous_rounded_rect_path(rect, radii, corner_smoothing);
+                cx.fill(&path, shadow.color, blur_radius);
+            } else {
+                let rounded_rect = RoundedRect::from_rect(rect, radii);
+                cx.fill(&rounded_rect, shadow.color, blur_radius);
+            }
         } else {
             cx.fill(&rect, shadow.color, blur_radius);
         }
     }
 }
 pub(crate) fn paint_outline(cx: &mut PaintCx, style: &ViewStyleProps, rect: Rect) {
+    let corner_smoothing = normalized_corner_smoothing(style.corner_smoothing());
     if cx.is_vger() {
         let outline = &style.outline();
         if outline.width == 0. {
@@ -1229,11 +1255,17 @@ pub(crate) fn paint_outline(cx: &mut PaintCx, style: &ViewStyleProps, rect: Rect
         let half = outline.width / 2.0;
         let rect = rect.inflate(half, half);
         let border_radii = border_to_radii_view(style, rect.size(), &cx.font_size_cx);
-        cx.stroke(
-            &rect.to_rounded_rect(radii_add(border_radii, half)),
-            &style.outline_color(),
-            outline,
-        );
+        let radii = radii_add(border_radii, half);
+        if should_use_continuous_corners(radii, corner_smoothing) {
+            let path = continuous_rounded_rect_path(rect, radii, corner_smoothing);
+            cx.stroke(&path, &style.outline_color(), outline);
+        } else {
+            cx.stroke(
+                &rect.to_rounded_rect(radii),
+                &style.outline_color(),
+                outline,
+            );
+        }
         return;
     }
 
@@ -1265,6 +1297,17 @@ pub(crate) fn paint_outline(cx: &mut PaintCx, style: &ViewStyleProps, rect: Rect
         |r| (r + half_width).max(0.0),
     );
 
+    if outline_progress >= 100.
+        && should_use_continuous_corners(radii, corner_smoothing)
+        && outlines
+            .iter()
+            .all(|outline| outline.0.width == outlines[0].0.width)
+    {
+        let path = continuous_rounded_rect_path(rect, radii, corner_smoothing);
+        cx.stroke(&path, &outline_color, &outlines[0].0);
+        return;
+    }
+
     let mut outline_path = BorderPath::new(rect, radii);
 
     // Only create subsegment if needed
@@ -1294,6 +1337,7 @@ pub(crate) fn paint_border(
     style: &ViewStyleProps,
     rect: Rect,
 ) {
+    let corner_smoothing = normalized_corner_smoothing(style.corner_smoothing());
     if cx.is_vger() {
         let border = layout_style.border();
 
@@ -1321,7 +1365,12 @@ pub(crate) fn paint_border(
             if let Some(color) = style.border_color().left {
                 if radii_max(radii) > 0.0 {
                     let radii = radii_map(radii, |r| (r - half).max(0.0));
-                    cx.stroke(&rect.to_rounded_rect(radii), &color, &left);
+                    if should_use_continuous_corners(radii, corner_smoothing) {
+                        let path = continuous_rounded_rect_path(rect, radii, corner_smoothing);
+                        cx.stroke(&path, &color, &left);
+                    } else {
+                        cx.stroke(&rect.to_rounded_rect(radii), &color, &left);
+                    }
                 } else {
                     cx.stroke(&rect, &color, &left);
                 }
@@ -1416,6 +1465,23 @@ pub(crate) fn paint_border(
         border_to_radii_view(style, rect.size(), &cx.font_size_cx),
         |r| (r - half_width).max(0.0),
     );
+
+    let border_color = style.border_color();
+    if border_progress >= 100.
+        && borders[0].0.width > 0.0
+        && borders
+            .iter()
+            .all(|border| border.0.width == borders[0].0.width && border.1 == borders[0].1)
+        && border_color.left.is_some()
+        && border_color.left == border_color.top
+        && border_color.top == border_color.right
+        && border_color.right == border_color.bottom
+        && should_use_continuous_corners(radii, corner_smoothing)
+    {
+        let path = continuous_rounded_rect_path(rect, radii, corner_smoothing);
+        cx.stroke(&path, &borders[0].1, &borders[0].0);
+        return;
+    }
 
     let mut border_path = BorderPath::new(rect, radii);
 

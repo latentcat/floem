@@ -6,6 +6,7 @@
 //! - [`Renderer`] - Backend renderer abstraction
 
 pub mod border_path_iter;
+pub(crate) mod corners;
 pub mod renderer;
 
 pub use border_path_iter::{BorderPath, BorderPathEvent};
@@ -13,7 +14,7 @@ pub use renderer::Renderer;
 
 use floem_renderer::Renderer as FloemRenderer;
 use floem_renderer::gpu_resources::{GpuResourceError, GpuResources};
-use peniko::kurbo::{Affine, RoundedRect, Shape, Size};
+use peniko::kurbo::{Affine, Rect, RoundedRect, Shape, Size};
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use understory_box_tree::NodeFlags;
@@ -313,10 +314,27 @@ impl GlobalPaintCx<'_> {
                     &state.view_style_props,
                     layout_rect,
                 );
+                let corner_smoothing =
+                    corners::normalized_corner_smoothing(state.view_style_props.corner_smoothing());
                 drop(state);
                 // Apply overflow clip (stays active through children)
                 if let Some(clip_shape) = clip {
-                    cx.clip(&clip_shape);
+                    let clip_rect = clip_shape.rect();
+                    if finite_rect(clip_rect)
+                        && corners::should_use_continuous_corners(
+                            clip_shape.radii(),
+                            corner_smoothing,
+                        )
+                    {
+                        let path = corners::continuous_rounded_rect_path(
+                            clip_rect,
+                            clip_shape.radii(),
+                            corner_smoothing,
+                        );
+                        cx.clip(&path);
+                    } else {
+                        cx.clip(&clip_shape);
+                    }
                 }
             }
             view.borrow_mut().paint(&mut cx);
@@ -331,6 +349,10 @@ impl GlobalPaintCx<'_> {
             }
         }
     }
+}
+
+fn finite_rect(rect: Rect) -> bool {
+    rect.x0.is_finite() && rect.y0.is_finite() && rect.x1.is_finite() && rect.y1.is_finite()
 }
 
 impl PaintCx<'_> {
@@ -367,6 +389,22 @@ impl PaintCx<'_> {
         } else {
             self.paint_state.renderer_mut().clear_clip();
         }
+    }
+
+    /// Blur the content already painted behind `rect`.
+    pub fn draw_backdrop_blur(
+        &mut self,
+        rect: peniko::kurbo::Rect,
+        radius: f64,
+        corner_radius: f64,
+    ) {
+        self.paint_state
+            .renderer_mut()
+            .draw_backdrop_blur(floem_renderer::BackdropBlur {
+                rect,
+                radius,
+                corner_radius,
+            });
     }
 
     // Note: get_transform/set_transform removed as Renderer doesn't expose transform()

@@ -1916,6 +1916,12 @@ define_builtin_props!(
     /// Sets the bottom-right border radius.
     BorderBottomRightRadius border_bottom_right_radius { tr }: Length {} = Length::Pt(0.),
 
+    /// Smooths border-radius corners with a continuous curvature transition.
+    ///
+    /// A value of `0.0` keeps the standard circular corner. Values up to `1.0`
+    /// increase the Figma-style smoothing amount.
+    CornerSmoothing corner_smoothing { tr }: f64 {} = 0.0,
+
     /// Sets the left padding.
     PaddingLeft padding_left { tr }: Length {} = Length::Pt(0.),
     /// Sets the top padding.
@@ -1973,6 +1979,9 @@ define_builtin_props!(
     ///
     /// Can be a solid color, gradient, or image.
     Background background { tr }: Option<Brush> [Brush] {} = None,
+
+    /// Blurs the already-painted content behind this view.
+    BackdropBlur backdrop_blur { tr }: Length {} = Length::Pt(0.),
 
     /// Sets the foreground color or pattern.
     ///

@@ -49,8 +49,8 @@
 //!
 use std::sync::Arc;
 
-use floem_renderer::Img;
 use floem_renderer::gpu_resources::GpuResources;
+use floem_renderer::{BackdropBlur, Img};
 #[cfg(feature = "skia")]
 use floem_skia_renderer::SkiaRenderer as ActiveRenderer;
 use floem_tiny_skia_renderer::TinySkiaRenderer;
@@ -362,6 +362,18 @@ impl floem_renderer::Renderer for Renderer {
             }
             Renderer::TinySkia(v) => {
                 v.draw_img(img, rect);
+            }
+            Renderer::Uninitialized { .. } => {}
+        }
+    }
+
+    fn draw_backdrop_blur(&mut self, blur: BackdropBlur) {
+        match self {
+            Renderer::Active(v) => {
+                v.draw_backdrop_blur(blur);
+            }
+            Renderer::TinySkia(v) => {
+                v.draw_backdrop_blur(blur);
             }
             Renderer::Uninitialized { .. } => {}
         }

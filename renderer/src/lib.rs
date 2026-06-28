@@ -79,6 +79,17 @@ pub struct Img<'a> {
     pub hash: &'a [u8],
 }
 
+/// A backdrop blur request clipped to a rounded rectangle.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BackdropBlur {
+    /// The destination rectangle in the current renderer coordinate space.
+    pub rect: Rect,
+    /// Blur radius in the same logical units as `rect`.
+    pub radius: f64,
+    /// Uniform corner radius in the same logical units as `rect`.
+    pub corner_radius: f64,
+}
+
 /// The core rendering trait that every Floem backend must implement.
 ///
 /// A frame is bracketed by [`begin`](Renderer::begin) and [`finish`](Renderer::finish).
@@ -198,6 +209,11 @@ pub trait Renderer {
     ///
     /// The image is scaled to fit the destination rectangle.
     fn draw_img(&mut self, img: Img<'_>, rect: Rect);
+
+    /// Blur the already-rendered backdrop behind `blur.rect` and composite it back.
+    ///
+    /// Backends that cannot sample the current render target may ignore this.
+    fn draw_backdrop_blur(&mut self, _blur: BackdropBlur) {}
 
     /// Finish the current frame and present it.
     ///

@@ -1908,6 +1908,7 @@ name = "floem_vello_renderer"
 version = "0.2.0"
 dependencies = [
  "anyhow",
+ "bytemuck",
  "floem_renderer",
  "parley",
  "peniko",

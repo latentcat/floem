@@ -1,9 +1,11 @@
 pub mod animation;
+pub mod background_blur;
 pub mod buttons;
 pub mod canvas;
 pub mod checkbox;
 pub mod clipboard;
 pub mod context_menu;
+pub mod corner_smoothing;
 pub mod draggable;
 pub mod dropdown;
 pub mod dropped_file;
@@ -45,6 +47,8 @@ fn app_view(window_id: WindowId) -> impl IntoView {
         "Text Editor",
         "Lists",
         "Image",
+        "Background Blur",
+        "Corner Smoothing",
         "Dropdown",
         "Checkbox",
         "Radio",
@@ -73,6 +77,8 @@ fn app_view(window_id: WindowId) -> impl IntoView {
             "Menu" => context_menu::menu_view().into_any(),
             "Rich Text" => rich_text::rich_text_view().into_any(),
             "Image" => images::img_view().into_any(),
+            "Background Blur" => background_blur::background_blur_view().into_any(),
+            "Corner Smoothing" => corner_smoothing::corner_smoothing_view().into_any(),
             "Clipboard" => clipboard::clipboard_view().into_any(),
             "Slider" => slider::slider_view().into_any(),
             "Dropdown" => dropdown::dropdown_view().into_any(),

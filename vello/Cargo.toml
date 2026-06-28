@@ -12,6 +12,7 @@ parley = { workspace = true }
 wgpu = { workspace = true }
 
 anyhow = "1.0"
+bytemuck = { version = "1", features = ["derive"] }
 vello = "0.7.0"
 vello_svg = "0.9.0"
 floem_renderer = { path = "../renderer", version = "0.2.0" }

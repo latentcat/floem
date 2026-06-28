@@ -5,6 +5,10 @@ use std::sync::Arc;
 use std::sync::mpsc::sync_channel;
 
 use anyhow::Result;
+use backdrop_blur::{
+    BackdropBlurCommand, BackdropBlurPipeline, ScratchTexturePool, backdrop_blur_command,
+};
+use floem_renderer::BackdropBlur;
 use floem_renderer::gpu_resources::GpuResources;
 use floem_renderer::text::{Glyph, GlyphRunProps};
 use floem_renderer::{Img, Renderer};
@@ -22,6 +26,13 @@ use vello::{AaConfig, RendererOptions, Scene};
 use wgpu::util::TextureBlitter;
 use wgpu::{Adapter, DeviceType, Queue, TextureAspect, TextureFormat};
 
+mod backdrop_blur;
+
+enum RenderSegment {
+    Scene(Scene),
+    BackdropBlur(BackdropBlurCommand),
+}
+
 pub struct VelloRenderer {
     device: Device,
     #[allow(unused)]
@@ -29,6 +40,9 @@ pub struct VelloRenderer {
     surface: RenderSurface<'static>,
     renderer: vello::Renderer,
     scene: Scene,
+    segments: Vec<RenderSegment>,
+    backdrop_blur_pipeline: BackdropBlurPipeline,
+    scratch_textures: ScratchTexturePool,
     alt_scene: Option<Scene>,
     window_scale: f64,
     transform: Affine,
@@ -116,7 +130,7 @@ impl VelloRenderer {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING,
+            usage: Self::target_texture_usage(),
             format: TextureFormat::Rgba8Unorm,
             view_formats: &[],
         });
@@ -134,6 +148,7 @@ impl VelloRenderer {
         };
 
         let scene = Scene::new();
+        let backdrop_blur_pipeline = BackdropBlurPipeline::new(&device, TextureFormat::Rgba8Unorm);
         let renderer = vello::Renderer::new(
             &device,
             RendererOptions {
@@ -151,6 +166,9 @@ impl VelloRenderer {
             surface: render_surface,
             renderer,
             scene,
+            segments: Vec::new(),
+            backdrop_blur_pipeline,
+            scratch_textures: ScratchTexturePool::default(),
             alt_scene: None,
             window_scale: scale,
             transform: Affine::IDENTITY,
@@ -174,7 +192,7 @@ impl VelloRenderer {
                 mip_level_count: 1,
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
-                usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING,
+                usage: Self::target_texture_usage(),
                 format: TextureFormat::Rgba8Unorm,
                 view_formats: &[],
             });
@@ -200,6 +218,28 @@ impl VelloRenderer {
             self.surface.config.height as f64,
         )
     }
+
+    const fn target_texture_usage() -> wgpu::TextureUsages {
+        wgpu::TextureUsages::STORAGE_BINDING
+            .union(wgpu::TextureUsages::TEXTURE_BINDING)
+            .union(wgpu::TextureUsages::RENDER_ATTACHMENT)
+            .union(wgpu::TextureUsages::COPY_SRC)
+            .union(wgpu::TextureUsages::COPY_DST)
+    }
+
+    const fn scene_texture_usage() -> wgpu::TextureUsages {
+        wgpu::TextureUsages::STORAGE_BINDING
+            .union(wgpu::TextureUsages::TEXTURE_BINDING)
+            .union(wgpu::TextureUsages::RENDER_ATTACHMENT)
+            .union(wgpu::TextureUsages::COPY_SRC)
+    }
+
+    const fn sampled_attachment_usage() -> wgpu::TextureUsages {
+        wgpu::TextureUsages::TEXTURE_BINDING
+            .union(wgpu::TextureUsages::RENDER_ATTACHMENT)
+            .union(wgpu::TextureUsages::COPY_SRC)
+            .union(wgpu::TextureUsages::COPY_DST)
+    }
 }
 
 impl Renderer for VelloRenderer {
@@ -218,6 +258,7 @@ impl Renderer for VelloRenderer {
             mem::swap(&mut self.scene, self.alt_scene.as_mut().unwrap());
         }
         self.transform = Affine::IDENTITY;
+        self.segments.clear();
 
         // Evict SVG scenes not used in the previous frame, then flip generation.
         let generation = self.cache_generation;
@@ -346,6 +387,16 @@ impl Renderer for VelloRenderer {
         );
     }
 
+    fn draw_backdrop_blur(&mut self, blur: BackdropBlur) {
+        let Some(command) = backdrop_blur_command(blur, self.device_transform()) else {
+            return;
+        };
+
+        let scene = mem::replace(&mut self.scene, Scene::new());
+        self.segments.push(RenderSegment::Scene(scene));
+        self.segments.push(RenderSegment::BackdropBlur(command));
+    }
+
     fn draw_svg<'b>(
         &mut self,
         svg: floem_renderer::Svg<'b>,
@@ -437,20 +488,24 @@ impl Renderer for VelloRenderer {
                 }
                 _ => return None,
             };
-            self.renderer
-                .render_to_texture(
-                    &self.device,
-                    &self.queue,
-                    &self.scene,
-                    &self.surface.target_view,
-                    &vello::RenderParams {
-                        base_color: palette::css::TRANSPARENT, // Background color
-                        width: self.surface.config.width,
-                        height: self.surface.config.height,
-                        antialiasing_method: vello::AaConfig::Msaa16,
-                    },
-                )
-                .unwrap();
+            if self.segments.is_empty() {
+                self.renderer
+                    .render_to_texture(
+                        &self.device,
+                        &self.queue,
+                        &self.scene,
+                        &self.surface.target_view,
+                        &vello::RenderParams {
+                            base_color: palette::css::TRANSPARENT, // Background color
+                            width: self.surface.config.width,
+                            height: self.surface.config.height,
+                            antialiasing_method: vello::AaConfig::Msaa16,
+                        },
+                    )
+                    .unwrap();
+            } else {
+                self.render_segmented_frame();
+            }
 
             // Perform the copy
             let mut encoder = self
@@ -486,6 +541,99 @@ impl Renderer for VelloRenderer {
 }
 
 impl VelloRenderer {
+    fn render_segmented_frame(&mut self) {
+        let width = self.surface.config.width.max(1);
+        let height = self.surface.config.height.max(1);
+        let texture_format = TextureFormat::Rgba8Unorm;
+        let surface_size = Size::new(width as f64, height as f64);
+        let current_scene = mem::replace(&mut self.scene, Scene::new());
+        self.segments.push(RenderSegment::Scene(current_scene));
+        let segments = mem::take(&mut self.segments);
+        self.scratch_textures.begin_frame();
+
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Floem segmented backdrop frame"),
+            });
+        self.backdrop_blur_pipeline
+            .encode_clear(&mut encoder, &self.surface.target_view);
+
+        for segment in segments {
+            match segment {
+                RenderSegment::Scene(scene) => {
+                    let segment_texture = self.scratch_textures.get(
+                        &self.device,
+                        width,
+                        height,
+                        texture_format,
+                        Self::scene_texture_usage(),
+                        "floem-vello-scene-segment",
+                    );
+                    let segment_view = self
+                        .scratch_textures
+                        .texture(segment_texture)
+                        .create_view(&wgpu::TextureViewDescriptor::default());
+                    self.renderer
+                        .render_to_texture(
+                            &self.device,
+                            &self.queue,
+                            &scene,
+                            &segment_view,
+                            &vello::RenderParams {
+                                base_color: palette::css::TRANSPARENT,
+                                width,
+                                height,
+                                antialiasing_method: vello::AaConfig::Msaa16,
+                            },
+                        )
+                        .unwrap();
+                    self.backdrop_blur_pipeline.encode_texture_composite(
+                        &self.device,
+                        &mut encoder,
+                        &segment_view,
+                        &self.surface.target_view,
+                    );
+                }
+                RenderSegment::BackdropBlur(command) => {
+                    let snapshot = self.scratch_textures.get(
+                        &self.device,
+                        width,
+                        height,
+                        texture_format,
+                        Self::sampled_attachment_usage(),
+                        "floem-backdrop-snapshot",
+                    );
+                    encoder.copy_texture_to_texture(
+                        self.surface.target_texture.as_image_copy(),
+                        self.scratch_textures.texture(snapshot).as_image_copy(),
+                        wgpu::Extent3d {
+                            width,
+                            height,
+                            depth_or_array_layers: 1,
+                        },
+                    );
+                    let snapshot_view = self
+                        .scratch_textures
+                        .texture(snapshot)
+                        .create_view(&wgpu::TextureViewDescriptor::default());
+                    self.backdrop_blur_pipeline.encode_blur_and_composite(
+                        &self.device,
+                        &mut encoder,
+                        &snapshot_view,
+                        &self.surface.target_view,
+                        texture_format,
+                        &mut self.scratch_textures,
+                        command,
+                        surface_size,
+                    );
+                }
+            }
+        }
+
+        self.queue.submit([encoder.finish()]);
+    }
+
     fn render_capture_image(&mut self) -> Option<peniko::ImageBrush> {
         let width_align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT - 1;
         let width = (self.surface.config.width + width_align) & !width_align;
