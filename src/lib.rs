@@ -202,6 +202,7 @@ pub use platform::menu;
 /// Re-export view_tuple module from view for backward compatibility.
 pub use view::tuple as view_tuple;
 pub mod headless;
+pub mod icons;
 pub mod style;
 pub mod view;
 pub mod views;
@@ -261,6 +262,7 @@ pub mod prelude {
     pub use crate::event::listener as el;
     pub use crate::event::listener;
     pub use crate::event::listener::EventListenerTrait;
+    pub use crate::icons::{IconData, IconLibrary, icon, icon_svg};
     pub use crate::unit::{DurationUnitExt, UnitExt};
     pub use crate::view::IntoViewIter;
     pub use crate::view::ViewTuple;

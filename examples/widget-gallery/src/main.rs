@@ -1,8 +1,10 @@
 pub mod animation;
 pub mod background_blur;
+pub mod badge;
 pub mod bevy_render_test;
 pub mod buttons;
 pub mod canvas;
+pub mod card;
 pub mod checkbox;
 pub mod clipboard;
 pub mod context_menu;
@@ -11,6 +13,7 @@ pub mod draggable;
 pub mod dropdown;
 pub mod dropped_file;
 pub mod form;
+pub mod icons;
 pub mod images;
 pub mod inputs;
 pub mod labels;
@@ -18,7 +21,10 @@ pub mod lists;
 pub mod radio_buttons;
 pub mod render_test_common;
 pub mod rich_text;
+pub mod separator;
+pub mod skeleton;
 pub mod slider;
+pub mod switch;
 pub mod tabs;
 pub mod texteditor;
 pub mod wgpu_render_test;
@@ -29,7 +35,8 @@ use floem::{
     menu::*,
     muda::{AboutMetadataBuilder, PredefinedMenuItem},
     new_window,
-    prelude::{palette::css, *},
+    peniko::Color,
+    prelude::*,
     style::{Background, CursorStyle, CustomStylable, Transition},
     theme::StyleThemeExt,
     ui_events::keyboard::{Key, KeyboardEvent, Modifiers, NamedKey},
@@ -42,10 +49,74 @@ pub const OS_MOD: Modifiers = if cfg!(target_os = "macos") {
     Modifiers::CONTROL
 };
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum GalleryThemeMode {
+    System,
+    Light,
+    Dark,
+}
+
+fn sidebar_button_style() -> floem::style::Style {
+    floem::style::Style::new()
+        .height(32.0)
+        .padding_horiz(12.0)
+        .background(Color::TRANSPARENT)
+        .border_color(Color::TRANSPARENT)
+        .with_theme(|s, t| {
+            s.color(t.sidebar_foreground())
+                .hover(|s| {
+                    s.background(t.sidebar_accent())
+                        .color(t.sidebar_accent_foreground())
+                })
+                .focus_visible(|s| s.outline_color(t.def(|t| t.sidebar_ring().with_alpha(0.3))))
+        })
+}
+
+fn theme_mode_button(
+    label: &'static str,
+    mode: GalleryThemeMode,
+    theme_mode: RwSignal<GalleryThemeMode>,
+) -> Button {
+    Button::new(label)
+        .action(move || {
+            theme_mode.set(mode);
+            match mode {
+                GalleryThemeMode::System => set_theme(None),
+                GalleryThemeMode::Light => set_theme(Some(Theme::Light)),
+                GalleryThemeMode::Dark => set_theme(Some(Theme::Dark)),
+            }
+        })
+        .style(move |s| {
+            s.height(28.0)
+                .padding_horiz(10.0)
+                .background(Color::TRANSPARENT)
+                .border_color(Color::TRANSPARENT)
+                .with_theme(|s, t| {
+                    s.color(t.sidebar_foreground()).hover(|s| {
+                        s.background(t.sidebar_accent())
+                            .color(t.sidebar_accent_foreground())
+                    })
+                })
+                .apply_if(theme_mode.get() == mode, |s| {
+                    s.with_theme(|s, t| {
+                        s.background(t.sidebar_accent())
+                            .color(t.sidebar_accent_foreground())
+                    })
+                })
+        })
+}
+
 fn app_view(window_id: WindowId) -> impl IntoView {
+    let theme_mode = RwSignal::new(GalleryThemeMode::System);
     let tabs: Vec<&'static str> = vec![
         "Label",
         "Button",
+        "Badge",
+        "Switch",
+        "Icon",
+        "Card",
+        "Separator",
+        "Skeleton",
         "Input",
         "Text Editor",
         "Lists",
@@ -73,6 +144,12 @@ fn app_view(window_id: WindowId) -> impl IntoView {
         match it {
             "Label" => labels::label_view().into_any(),
             "Button" => buttons::button_view().into_any(),
+            "Badge" => badge::badge_view().into_any(),
+            "Switch" => switch::switch_view().into_any(),
+            "Icon" => icons::icons_view().into_any(),
+            "Card" => card::card_view().into_any(),
+            "Separator" => separator::separator_view().into_any(),
+            "Skeleton" => skeleton::skeleton_view().into_any(),
             "Checkbox" => checkbox::checkbox_view().into_any(),
             "Radio" => radio_buttons::radio_buttons_view().into_any(),
             "Input" => inputs::text_input_view().into_any(),
@@ -107,27 +184,52 @@ fn app_view(window_id: WindowId) -> impl IntoView {
         .into_iter()
         .map(move |item| {
             item.style(move |s| {
-                s.font_size(18.)
-                    .height(36.0)
+                s.font_size(14.)
+                    .height(32.0)
                     .width_full()
+                    .padding_horiz(10.0)
                     .items_center()
                     .transition(Background, Transition::ease_in_out(100.millis()))
+                    .with_theme(|s, t| s.color(t.sidebar_foreground()))
                     .active(|s| {
                         s.with_theme(|s, t| {
-                            s.background(t.primary())
-                                .hover(|s| s.background(t.primary_muted()))
+                            s.background(t.sidebar_accent())
+                                .color(t.sidebar_foreground())
+                                .hover(|s| s.background(t.sidebar_accent()))
                                 .border_radius(t.border_radius())
                         })
                     })
-                    .hover(|s| s.cursor(CursorStyle::Pointer))
+                    .selected(|s| {
+                        s.with_theme(|s, t| {
+                            s.background(t.sidebar_accent())
+                                .color(t.sidebar_foreground())
+                                .hover(|s| s.background(t.sidebar_accent()))
+                                .border_radius(t.border_radius())
+                        })
+                    })
+                    .hover(|s| {
+                        s.cursor(CursorStyle::Pointer).with_theme(|s, t| {
+                            s.background(t.sidebar_accent())
+                                .color(t.sidebar_foreground())
+                        })
+                    })
             })
         })
         .list()
         .style(|s| {
             s.flex_col()
-                .width(140.0)
+                .width_full()
                 .flex_grow(1.)
-                .even(|s| s.background(css::PINK))
+                .gap(2.0)
+                .class(ListItemClass, |s| {
+                    s.selected(|s| {
+                        s.with_theme(|s, t| {
+                            s.background(t.sidebar_accent())
+                                .color(t.sidebar_foreground())
+                                .hover(|s| s.background(t.sidebar_accent()))
+                        })
+                    })
+                })
         });
 
     let active_tab = side_bar_list.selection();
@@ -137,34 +239,74 @@ fn app_view(window_id: WindowId) -> impl IntoView {
         .debug_name("Side Tab Bar")
         .custom_style(|s| s.shrink_to_fit())
         .style(|s| {
-            s.border(1.)
-                .flex_col()
-                .padding(3.)
-                .border_color(palette::css::GRAY)
+            s.flex_col()
+                .width_full()
+                .flex_grow(1.0)
+                .padding(8.0)
+                .with_theme(|s, t| s.background(t.sidebar()).color(t.sidebar_foreground()))
                 .class(LabelClass, |s| s.selectable(false))
         });
 
-    let inspector = Button::new("Open Inspector").action(floem::action::inspect);
-
-    let new_window_button = Button::new("Open In Window").action(move || {
-        let name = tabs.with(|tabs| tabs.get(active_tab.get().unwrap_or(0)).copied());
-        new_window(
-            move |_| {
-                create_view(name.unwrap_or_default())
-                    .scroll()
-                    .style(|s| s.size_full())
-            },
-            Some(
-                WindowConfig::default()
-                    .size(Size::new(700.0, 400.0))
-                    .title(name.unwrap_or_default()),
-            ),
-        );
+    let theme_mode_control = Stack::horizontal((
+        theme_mode_button("System", GalleryThemeMode::System, theme_mode),
+        theme_mode_button("Light", GalleryThemeMode::Light, theme_mode),
+        theme_mode_button("Dark", GalleryThemeMode::Dark, theme_mode),
+    ))
+    .style(|s| {
+        s.width_full()
+            .items_center()
+            .gap(2.0)
+            .padding(2.0)
+            .border(1.0)
+            .border_radius(14.0)
+            .with_theme(|s, t| s.border_color(t.sidebar_border()))
     });
 
-    let left_side_bar = Stack::vertical((side_tab_bar, new_window_button, inspector))
+    let inspector = Button::new("Open Inspector")
+        .action(floem::action::inspect)
+        .style(|s| s.width_full().justify_start().apply(sidebar_button_style()));
+
+    let new_window_button = Button::new("Open In Window")
+        .action(move || {
+            let name = tabs.with(|tabs| tabs.get(active_tab.get().unwrap_or(0)).copied());
+            new_window(
+                move |_| {
+                    create_view(name.unwrap_or_default())
+                        .scroll()
+                        .style(|s| s.size_full())
+                },
+                Some(
+                    WindowConfig::default()
+                        .size(Size::new(700.0, 400.0))
+                        .title(name.unwrap_or_default()),
+                ),
+            );
+        })
+        .style(|s| s.width_full().justify_start().apply(sidebar_button_style()));
+
+    let separator = Empty::new().style(|s| {
+        s.width_full()
+            .height(1.0)
+            .flex_shrink(0.0)
+            .with_theme(|s, t| s.background(t.sidebar_border()))
+    });
+
+    let fixed_sidebar_controls =
+        Stack::vertical((theme_mode_control, new_window_button, inspector))
+            .style(|s| s.width_full().padding(8.0).row_gap(8.0).flex_shrink(0.0));
+
+    let left_side_bar = Stack::vertical((side_tab_bar, separator, fixed_sidebar_controls))
         .debug_name("Left Side Bar")
-        .style(|s| s.height_full().row_gap(5.0));
+        .style(|s| {
+            s.height_full()
+                .width(216.0)
+                .border_right(1.0)
+                .with_theme(|s, t| {
+                    s.background(t.sidebar())
+                        .color(t.sidebar_foreground())
+                        .border_color(t.sidebar_border())
+                })
+        });
 
     let tab = tab(
         move || Some(active_tab.get().unwrap_or(0)),
@@ -175,7 +317,11 @@ fn app_view(window_id: WindowId) -> impl IntoView {
     .debug_name("Active Tab")
     .style(|s| s.flex_col().flex_grow(1.).items_start());
 
-    let tab = tab.scroll().style(|s| s.size_full());
+    let tab = tab.scroll().style(|s| {
+        s.size_full()
+            .padding(12.0)
+            .with_theme(|s, t| s.background(t.background()).color(t.foreground()))
+    });
 
     let floem_logo = svg(include_str!("../assets/floem.svg"))
         .style(|s| s.unset_color().size_full().size(50, 50))
@@ -189,7 +335,11 @@ fn app_view(window_id: WindowId) -> impl IntoView {
         });
 
     let view = Stack::horizontal((left_side_bar, tab, floem_logo))
-        .style(|s| s.padding(5.0).width_full().height_full().col_gap(5.0))
+        .style(|s| {
+            s.width_full()
+                .height_full()
+                .with_theme(|s, t| s.background(t.background()).color(t.foreground()))
+        })
         .window_title(|| "Widget Gallery".to_owned());
 
     let file_submenu = |m: SubMenu| {

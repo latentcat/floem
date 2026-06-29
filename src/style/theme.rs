@@ -108,6 +108,30 @@ style_debug_group!(
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DesignSystem {
+    pub background: Color,
+    pub foreground: Color,
+    pub card: Color,
+    pub card_foreground: Color,
+    pub popover: Color,
+    pub popover_foreground: Color,
+    pub primary: Color,
+    pub primary_foreground: Color,
+    pub secondary: Color,
+    pub secondary_foreground: Color,
+    pub muted: Color,
+    pub muted_foreground: Color,
+    pub accent: Color,
+    pub accent_foreground: Color,
+    pub destructive: Color,
+    pub border: Color,
+    pub input: Color,
+    pub ring: Color,
+    pub sidebar: Color,
+    pub sidebar_foreground: Color,
+    pub sidebar_accent: Color,
+    pub sidebar_accent_foreground: Color,
+    pub sidebar_border: Color,
+    pub sidebar_ring: Color,
     pub bg_base: Color,
     pub text_base: Color,
     pub text_lightness: f32,
@@ -126,16 +150,46 @@ pub struct DesignSystem {
 impl DesignSystem {
     /// Create a light mode design system.
     pub fn light() -> Self {
+        let background = Color::from_rgb8(255, 255, 255);
+        let foreground = Color::from_rgb8(10, 10, 10);
+        let primary = Color::from_rgb8(23, 23, 23);
+        let secondary = Color::from_rgb8(245, 245, 245);
+        let muted_foreground = Color::from_rgb8(115, 115, 115);
+        let destructive = Color::from_rgb8(231, 0, 11);
         Self {
-            bg_base: Color::from_rgb8(248, 248, 248),
-            text_base: Color::from_rgb8(0, 0, 0),
+            background,
+            foreground,
+            card: background,
+            card_foreground: foreground,
+            popover: background,
+            popover_foreground: foreground,
+            primary,
+            primary_foreground: Color::from_rgb8(250, 250, 250),
+            secondary,
+            secondary_foreground: primary,
+            muted: secondary,
+            muted_foreground,
+            accent: secondary,
+            accent_foreground: primary,
+            destructive,
+            border: Color::from_rgb8(229, 229, 229),
+            input: Color::from_rgb8(229, 229, 229),
+            ring: Color::from_rgb8(161, 161, 161),
+            sidebar: Color::from_rgb8(250, 250, 250),
+            sidebar_foreground: foreground,
+            sidebar_accent: secondary,
+            sidebar_accent_foreground: primary,
+            sidebar_border: Color::from_rgb8(229, 229, 229),
+            sidebar_ring: Color::from_rgb8(161, 161, 161),
+            bg_base: background,
+            text_base: foreground,
             text_lightness: 0.05,
-            primary_base: Color::from_rgb8(0x18, 0x96, 0xC2),
+            primary_base: primary,
             success_base: Color::from_rgb8(0x2D, 0x9D, 0x67),
             warning_base: Color::from_rgb8(0xE5, 0xA2, 0x23),
-            danger_base: Color::from_rgb8(0xD7, 0x37, 0x45),
-            padding: 5.,
-            border_radius: 5.,
+            danger_base: destructive,
+            padding: 8.,
+            border_radius: 10.,
             font_size: 14.,
             is_dark: false,
         }
@@ -143,16 +197,46 @@ impl DesignSystem {
 
     /// Create a dark mode design system.
     pub fn dark() -> Self {
+        let background = Color::from_rgb8(10, 10, 10);
+        let foreground = Color::from_rgb8(250, 250, 250);
+        let card = Color::from_rgb8(23, 23, 23);
+        let secondary = Color::from_rgb8(38, 38, 38);
+        let primary = Color::from_rgb8(229, 229, 229);
+        let destructive = Color::from_rgb8(255, 100, 103);
         Self {
-            bg_base: Color::from_rgb8(0x24, 0x24, 0x24),
-            text_base: Color::from_rgb8(255, 255, 255),
+            background,
+            foreground,
+            card,
+            card_foreground: foreground,
+            popover: card,
+            popover_foreground: foreground,
+            primary,
+            primary_foreground: card,
+            secondary,
+            secondary_foreground: foreground,
+            muted: secondary,
+            muted_foreground: Color::from_rgb8(161, 161, 161),
+            accent: secondary,
+            accent_foreground: foreground,
+            destructive,
+            border: Color::from_rgb8(255, 255, 255).with_alpha(0.10),
+            input: Color::from_rgb8(255, 255, 255).with_alpha(0.15),
+            ring: Color::from_rgb8(115, 115, 115),
+            sidebar: card,
+            sidebar_foreground: foreground,
+            sidebar_accent: secondary,
+            sidebar_accent_foreground: foreground,
+            sidebar_border: Color::from_rgb8(255, 255, 255).with_alpha(0.10),
+            sidebar_ring: Color::from_rgb8(115, 115, 115),
+            bg_base: background,
+            text_base: foreground,
             text_lightness: 0.95,
-            primary_base: Color::from_rgb8(0x3A, 0xAA, 0xD8),
+            primary_base: primary,
             success_base: Color::from_rgb8(0x4A, 0xBE, 0x8A),
             warning_base: Color::from_rgb8(0xF5, 0xB8, 0x4E),
-            danger_base: Color::from_rgb8(0xF0, 0x56, 0x54),
-            padding: 5.,
-            border_radius: 5.,
+            danger_base: destructive,
+            padding: 8.,
+            border_radius: 10.,
             font_size: 14.,
             is_dark: true,
         }
@@ -161,59 +245,134 @@ impl DesignSystem {
     // Background levels
 
     pub fn bg_base(&self) -> Color {
-        self.bg_base
+        self.background
     }
 
     pub fn bg_elevated(&self) -> Color {
-        let adjustment = 0.05;
-        self.bg_base.map_lightness(|l| l + adjustment)
+        self.muted
     }
 
     pub fn bg_overlay(&self) -> Color {
-        let adjustment = 0.10;
-        self.bg_base.map_lightness(|l| l + adjustment)
+        self.popover
     }
 
     pub fn bg_disabled(&self) -> Color {
-        let adjustment = if self.is_dark { -0.05 } else { -0.1 };
-        self.bg_base.map_lightness(|l| l + adjustment)
+        self.muted.with_alpha(0.5)
     }
 
     // Border
 
     pub fn border(&self) -> Color {
-        let adjustment = if self.is_dark { 0.25 } else { -0.25 };
-        self.bg_base.map_lightness(|l| l + adjustment)
+        self.border
     }
 
     pub fn border_muted(&self) -> Color {
-        let adjustment = if self.is_dark { 0.15 } else { -0.15 };
-        self.border()
-            .map_lightness(|l| l + adjustment)
-            .with_alpha(0.8)
+        self.border
+            .with_alpha(if self.is_dark { 0.55 } else { 0.8 })
     }
 
     // Text
 
     pub fn text(&self) -> Color {
-        self.text_base.map_lightness(|_| self.text_lightness)
+        self.foreground
     }
 
     pub fn text_muted(&self) -> Color {
-        let adjustment = if self.is_dark { -0.25 } else { 0.25 };
-        self.text_base
-            .map_lightness(|l| l + adjustment)
-            .with_alpha(0.5)
+        self.muted_foreground
     }
 
     // Primary
 
     pub fn primary(&self) -> Color {
-        self.primary_base
+        self.primary
     }
 
     pub fn primary_muted(&self) -> Color {
-        self.primary_base.map_lightness(|l| l - 0.05)
+        self.primary.with_alpha(0.8)
+    }
+
+    pub fn primary_foreground(&self) -> Color {
+        self.primary_foreground
+    }
+
+    pub fn secondary(&self) -> Color {
+        self.secondary
+    }
+
+    pub fn secondary_foreground(&self) -> Color {
+        self.secondary_foreground
+    }
+
+    pub fn muted(&self) -> Color {
+        self.muted
+    }
+
+    pub fn muted_foreground(&self) -> Color {
+        self.muted_foreground
+    }
+
+    pub fn accent(&self) -> Color {
+        self.accent
+    }
+
+    pub fn accent_foreground(&self) -> Color {
+        self.accent_foreground
+    }
+
+    pub fn input(&self) -> Color {
+        self.input
+    }
+
+    pub fn input_muted(&self) -> Color {
+        self.input.with_alpha(if self.is_dark { 0.9 } else { 0.5 })
+    }
+
+    pub fn switch_unchecked(&self) -> Color {
+        if self.is_dark {
+            Color::from_rgb8(255, 255, 255).with_alpha(0.12)
+        } else {
+            self.input
+        }
+    }
+
+    pub fn ring(&self) -> Color {
+        self.ring
+    }
+
+    pub fn ring_focus(&self) -> Color {
+        self.ring.with_alpha(0.5)
+    }
+
+    pub fn sidebar(&self) -> Color {
+        self.sidebar
+    }
+
+    pub fn sidebar_foreground(&self) -> Color {
+        self.sidebar_foreground
+    }
+
+    pub fn sidebar_accent(&self) -> Color {
+        self.sidebar_accent
+    }
+
+    pub fn sidebar_accent_foreground(&self) -> Color {
+        self.sidebar_accent_foreground
+    }
+
+    pub fn sidebar_border(&self) -> Color {
+        self.sidebar_border
+    }
+
+    pub fn sidebar_ring(&self) -> Color {
+        self.sidebar_ring
+    }
+
+    pub fn button_secondary_hover(&self) -> Color {
+        if self.is_dark {
+            Color::from_rgb8(49, 49, 49)
+        } else {
+            Color::from_rgb8(233, 233, 233)
+        }
     }
 
     // Semantic colors
@@ -227,11 +386,11 @@ impl DesignSystem {
     }
 
     pub fn danger(&self) -> Color {
-        self.danger_base
+        self.destructive
     }
 
     pub fn info(&self) -> Color {
-        self.primary_base
+        self.primary
     }
 
     pub fn padding(&self) -> f32 {
@@ -304,13 +463,18 @@ impl StylePropValue for DesignSystem {
         let content = Stack::new((
             header,
             Stack::new((
-                color_swatch("bg_base", design_system.bg_base),
-                color_swatch("text_base", design_system.text_base),
-                color_swatch("primary_base", design_system.primary_base),
-                color_swatch("success_base", design_system.success_base),
-                color_swatch("warning_base", design_system.warning_base),
-                color_swatch("danger_base", design_system.danger_base),
-                scalar_field("text_lightness", f64::from(design_system.text_lightness)),
+                color_swatch("background", design_system.background),
+                color_swatch("foreground", design_system.foreground),
+                color_swatch("primary", design_system.primary),
+                color_swatch("primary_fg", design_system.primary_foreground),
+                color_swatch("secondary", design_system.secondary),
+                color_swatch("muted", design_system.muted),
+                color_swatch("muted_fg", design_system.muted_foreground),
+                color_swatch("accent", design_system.accent),
+                color_swatch("destructive", design_system.destructive),
+                color_swatch("border", design_system.border),
+                color_swatch("sidebar", design_system.sidebar),
+                color_swatch("sidebar_accent", design_system.sidebar_accent),
                 scalar_field("padding", f64::from(design_system.padding)),
                 scalar_field("border_radius", f64::from(design_system.border_radius)),
                 scalar_field("font_size", design_system.font_size),
@@ -349,6 +513,80 @@ impl StylePropValue for DesignSystem {
         let inv_t64 = 1.0 - t64;
 
         Some(DesignSystem {
+            background: self
+                .background
+                .lerp(other.background, t, HueDirection::default()),
+            foreground: self
+                .foreground
+                .lerp(other.foreground, t, HueDirection::default()),
+            card: self.card.lerp(other.card, t, HueDirection::default()),
+            card_foreground: self.card_foreground.lerp(
+                other.card_foreground,
+                t,
+                HueDirection::default(),
+            ),
+            popover: self.popover.lerp(other.popover, t, HueDirection::default()),
+            popover_foreground: self.popover_foreground.lerp(
+                other.popover_foreground,
+                t,
+                HueDirection::default(),
+            ),
+            primary: self.primary.lerp(other.primary, t, HueDirection::default()),
+            primary_foreground: self.primary_foreground.lerp(
+                other.primary_foreground,
+                t,
+                HueDirection::default(),
+            ),
+            secondary: self
+                .secondary
+                .lerp(other.secondary, t, HueDirection::default()),
+            secondary_foreground: self.secondary_foreground.lerp(
+                other.secondary_foreground,
+                t,
+                HueDirection::default(),
+            ),
+            muted: self.muted.lerp(other.muted, t, HueDirection::default()),
+            muted_foreground: self.muted_foreground.lerp(
+                other.muted_foreground,
+                t,
+                HueDirection::default(),
+            ),
+            accent: self.accent.lerp(other.accent, t, HueDirection::default()),
+            accent_foreground: self.accent_foreground.lerp(
+                other.accent_foreground,
+                t,
+                HueDirection::default(),
+            ),
+            destructive: self
+                .destructive
+                .lerp(other.destructive, t, HueDirection::default()),
+            border: self.border.lerp(other.border, t, HueDirection::default()),
+            input: self.input.lerp(other.input, t, HueDirection::default()),
+            ring: self.ring.lerp(other.ring, t, HueDirection::default()),
+            sidebar: self.sidebar.lerp(other.sidebar, t, HueDirection::default()),
+            sidebar_foreground: self.sidebar_foreground.lerp(
+                other.sidebar_foreground,
+                t,
+                HueDirection::default(),
+            ),
+            sidebar_accent: self.sidebar_accent.lerp(
+                other.sidebar_accent,
+                t,
+                HueDirection::default(),
+            ),
+            sidebar_accent_foreground: self.sidebar_accent_foreground.lerp(
+                other.sidebar_accent_foreground,
+                t,
+                HueDirection::default(),
+            ),
+            sidebar_border: self.sidebar_border.lerp(
+                other.sidebar_border,
+                t,
+                HueDirection::default(),
+            ),
+            sidebar_ring: self
+                .sidebar_ring
+                .lerp(other.sidebar_ring, t, HueDirection::default()),
             bg_base: self.bg_base.lerp(other.bg_base, t, HueDirection::default()),
             text_base: self
                 .text_base
@@ -392,6 +630,24 @@ impl ThemeExpr {
     pub fn bg_base(self) -> ContextValue<Color> {
         self.def(|t| t.bg_base())
     }
+    pub fn background(self) -> ContextValue<Color> {
+        self.def(|t| t.background)
+    }
+    pub fn foreground(self) -> ContextValue<Color> {
+        self.def(|t| t.foreground)
+    }
+    pub fn card(self) -> ContextValue<Color> {
+        self.def(|t| t.card)
+    }
+    pub fn card_foreground(self) -> ContextValue<Color> {
+        self.def(|t| t.card_foreground)
+    }
+    pub fn popover(self) -> ContextValue<Color> {
+        self.def(|t| t.popover)
+    }
+    pub fn popover_foreground(self) -> ContextValue<Color> {
+        self.def(|t| t.popover_foreground)
+    }
     pub fn bg_elevated(self) -> ContextValue<Color> {
         self.def(|t| t.bg_elevated())
     }
@@ -418,6 +674,63 @@ impl ThemeExpr {
     }
     pub fn primary_muted(self) -> ContextValue<Color> {
         self.def(|t| t.primary_muted())
+    }
+    pub fn primary_foreground(self) -> ContextValue<Color> {
+        self.def(|t| t.primary_foreground())
+    }
+    pub fn secondary(self) -> ContextValue<Color> {
+        self.def(|t| t.secondary())
+    }
+    pub fn secondary_foreground(self) -> ContextValue<Color> {
+        self.def(|t| t.secondary_foreground())
+    }
+    pub fn muted(self) -> ContextValue<Color> {
+        self.def(|t| t.muted())
+    }
+    pub fn muted_foreground(self) -> ContextValue<Color> {
+        self.def(|t| t.muted_foreground())
+    }
+    pub fn accent(self) -> ContextValue<Color> {
+        self.def(|t| t.accent())
+    }
+    pub fn accent_foreground(self) -> ContextValue<Color> {
+        self.def(|t| t.accent_foreground())
+    }
+    pub fn input(self) -> ContextValue<Color> {
+        self.def(|t| t.input())
+    }
+    pub fn input_muted(self) -> ContextValue<Color> {
+        self.def(|t| t.input_muted())
+    }
+    pub fn switch_unchecked(self) -> ContextValue<Color> {
+        self.def(|t| t.switch_unchecked())
+    }
+    pub fn ring(self) -> ContextValue<Color> {
+        self.def(|t| t.ring())
+    }
+    pub fn ring_focus(self) -> ContextValue<Color> {
+        self.def(|t| t.ring_focus())
+    }
+    pub fn sidebar(self) -> ContextValue<Color> {
+        self.def(|t| t.sidebar())
+    }
+    pub fn sidebar_foreground(self) -> ContextValue<Color> {
+        self.def(|t| t.sidebar_foreground())
+    }
+    pub fn sidebar_accent(self) -> ContextValue<Color> {
+        self.def(|t| t.sidebar_accent())
+    }
+    pub fn sidebar_accent_foreground(self) -> ContextValue<Color> {
+        self.def(|t| t.sidebar_accent_foreground())
+    }
+    pub fn sidebar_border(self) -> ContextValue<Color> {
+        self.def(|t| t.sidebar_border())
+    }
+    pub fn sidebar_ring(self) -> ContextValue<Color> {
+        self.def(|t| t.sidebar_ring())
+    }
+    pub fn button_secondary_hover(self) -> ContextValue<Color> {
+        self.def(|t| t.button_secondary_hover())
     }
     pub fn success(self) -> ContextValue<Color> {
         self.def(|t| t.success())
@@ -477,15 +790,16 @@ impl StyleThemeExt for ExprStyle {
 //     Style::new().hover(|s| s.with::<Theme>(|s, t| s.translate_x(t.def(|t| t.padding))))
 // }
 pub fn hover_style() -> Style {
-    Style::new().hover(|s| s.with_theme(|s, t| s.background(t.def(|t| t.bg_elevated()))))
+    Style::new().hover(|s| s.with_theme(|s, t| s.background(t.muted())))
 }
 
 pub fn focus_style() -> Style {
-    let focus_visible_applied_style = Style::new().outline(3.0);
+    let focus_visible_applied_style = Style::new()
+        .outline(3.0)
+        .with_theme(|s, t| s.outline_color(t.ring_focus()).border_color(t.ring()));
 
     Style::new()
         .keyboard_navigable()
-        .with::<Theme>(|s, t| s.outline_color(t.def(|t| t.primary().with_alpha(0.5))))
         .focus_visible(|_| focus_visible_applied_style.clone())
 }
 
@@ -504,7 +818,7 @@ pub fn item_selected_style() -> Style {
     Style::new().selected(|s| {
         s.with_theme(|s, t| {
             s.background(t.primary())
-                .color(t.bg_base())
+                .color(t.primary_foreground())
                 .hover(|s| s.background(t.primary_muted()))
         })
         .transition_background(Transition::linear(100.millis()))
@@ -518,8 +832,8 @@ pub fn overlay_style() -> Style {
             s.border_color(t.border())
                 .border_radius(t.border_radius())
                 .padding(t.padding())
-                .color(t.text())
-                .background(t.bg_overlay())
+                .color(t.popover_foreground())
+                .background(t.popover())
                 .set_context(
                     BoxShadowProp,
                     t.def(move |theme| {
@@ -550,28 +864,29 @@ pub fn overlay_style() -> Style {
 pub(crate) fn default_theme(os_theme: winit::window::Theme) -> Style {
     let button_style = Style::new()
         .selectable(false)
+        .height(32.0)
+        .padding_horiz(10.0)
+        .padding_vert(0.0)
+        .gap(6.0)
+        .border_radius(10.0)
+        .corner_smoothing(0.6)
+        .border(1.0)
+        .border_color(Color::TRANSPARENT)
+        .font_size(14.0)
+        .font_weight(FontWeight::MEDIUM)
         .with_theme(|s, t| {
-            s.background(t.bg_elevated())
-                .padding(t.padding())
-                .disabled(|s| {
-                    s.background(t.bg_disabled())
-                        .color(t.text_muted())
-                        .unset_cursor()
-                })
-                .hover(|s| s.background(t.bg_overlay()))
-                .active(move |s| {
-                    s.background(t.def(|theme| {
-                        let adjustment = if theme.is_dark { 0.1 } else { -0.2 };
-                        Brush::Solid(theme.bg_overlay().map_lightness(|l| l + adjustment))
-                    }))
-                })
+            s.background(t.primary())
+                .color(t.primary_foreground())
+                .hover(|s| s.background(t.primary_muted()))
+                .disabled(|s| s.set(Opacity, 0.5).unset_cursor())
+                .active(move |s| s.translate_y(t.def(|_| 1.0)))
         })
         .transition(Background, Transition::linear(100.millis()))
+        .transition(Foreground, Transition::linear(100.millis()))
         .justify_center()
         .items_center()
         .cursor(CursorStyle::Pointer)
-        .apply(focus_style())
-        .apply(border_style(true));
+        .apply(focus_style());
 
     let checkbox_style = Style::new()
         .size(20, 20)
@@ -675,44 +990,65 @@ pub(crate) fn default_theme(os_theme: winit::window::Theme) -> Style {
         });
 
     let toggle_button_style = Style::new()
-        .height(1.75.em())
+        .width(32.0)
+        .height(18.4)
+        .padding(0.0)
+        .border(1.0)
+        .border_color(Color::TRANSPARENT)
         .with_theme(|s, t| {
-            s.background(t.bg_elevated())
-                .padding(t.padding())
-                .set_context_opt(Foreground, t.def(|t| Some(Brush::Solid(t.text_muted()))))
-                .active(|s| {
+            s.background(t.switch_unchecked())
+                .set_context_opt(
+                    Foreground,
+                    t.def(|t| {
+                        Some(Brush::Solid(if t.is_dark {
+                            t.foreground
+                        } else {
+                            t.background
+                        }))
+                    }),
+                )
+                .selected(|s| {
                     s.background(t.primary())
-                        .color(t.bg_base())
-                        .set_context_opt(Foreground, t.def(|t| Some(Brush::Solid(t.bg_base()))))
+                        .border_color(t.primary())
+                        .set_context_opt(
+                            Foreground,
+                            t.def(|t| {
+                                Some(Brush::Solid(if t.is_dark {
+                                    t.primary_foreground
+                                } else {
+                                    t.background
+                                }))
+                            }),
+                        )
                 })
-                .hover(|s| s.background(t.bg_overlay()))
+                .disabled(|s| s.set(Opacity, 0.5).unset_cursor())
         })
-        .aspect_ratio(2.)
-        // .focus(|s| s.with_theme(|s, t| s.hover(|s| s.background(t.bg_overlay()))))
-        .border_radius(50.pct())
-        .set(ToggleButtonCircleRad, 75.pct())
-        .set(ToggleButtonInset, 10.pct())
-        .apply(border_style(false))
+        .flex_shrink(0.0)
+        .border_radius(100.pct())
+        .corner_smoothing(0.6)
+        .set(ToggleButtonCircleRad, 8.0)
+        .set(ToggleButtonInset, 1.0)
+        .cursor(CursorStyle::Pointer)
+        .transition(Background, Transition::linear(100.millis()))
         .apply(focus_style());
 
     let input_style = Style::new()
+        .height(32.0)
+        .padding_horiz(10.0)
+        .padding_vert(4.0)
+        .border_radius(18.0)
+        .border(1.0)
+        .border_color(Color::TRANSPARENT)
+        .font_size(14.0)
         .with_theme(|s, t| {
-            s.background(t.bg_base())
-                .padding(t.padding())
+            s.background(t.input_muted())
                 .set_context(
                     SelectionColor,
                     t.def(|t| Brush::Solid(t.primary_muted().with_alpha(0.5))),
                 )
-                .cursor_color(t.primary_muted())
-                .hover(|s| s.background(t.bg_elevated()))
-                .disabled(|s| {
-                    s.background(t.bg_disabled())
-                        .color(t.text_muted())
-                        .unset_cursor()
-                })
+                .cursor_color(t.primary())
+                .disabled(|s| s.set(Opacity, 0.5).unset_cursor())
         })
-        .focus(|s| s.with_theme(|s, t| s.hover(|s| s.background(t.bg_overlay()))))
-        .apply(border_style(true))
         .apply(focus_style())
         .cursor(CursorStyle::Text);
 
