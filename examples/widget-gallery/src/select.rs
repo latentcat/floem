@@ -103,6 +103,7 @@ fn select_item(region: Option<Region>, selected: RwSignal<Option<Region>>) -> An
     let Some(region) = region else {
         return Empty::new().into_any();
     };
+    let is_selected = selected.get_untracked() == Some(region);
 
     Stack::horizontal((
         Stack::vertical((
@@ -113,13 +114,11 @@ fn select_item(region: Option<Region>, selected: RwSignal<Option<Region>>) -> An
             }),
         ))
         .style(|s| s.flex_col().gap(1.0)),
-        dyn_view(move || {
-            if selected.get() == Some(region) {
-                icon("check", 16.0)
-            } else {
-                Empty::new().style(|s| s.size(16.0, 16.0)).into_any()
-            }
-        }),
+        if is_selected {
+            icon("check", 16.0)
+        } else {
+            Empty::new().style(|s| s.size(16.0, 16.0)).into_any()
+        },
     ))
     .style(|s| s.items_center().justify_between().gap(12.0).width_full())
     .into_any()

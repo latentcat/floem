@@ -21,6 +21,13 @@ enum TabsOrientation {
     Vertical,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TabsLayout {
+    Fit,
+    FillProportional,
+    FillEqual,
+}
+
 fn icon(name: &'static str, size: f64) -> AnyView {
     icon_library::icon(IconLibrary::Lucide, name)
         .map(|icon| {
@@ -47,6 +54,7 @@ fn tabs_trigger(
     active: RwSignal<usize>,
     variant: TabsVariant,
     orientation: TabsOrientation,
+    layout: TabsLayout,
     disabled: bool,
 ) -> Button {
     Button::new(trigger_content(label, icon_name))
@@ -66,6 +74,14 @@ fn tabs_trigger(
                 .corner_smoothing(0.6)
                 .font_size(14.0)
                 .font_weight(FontWeight::MEDIUM)
+                .apply_if(
+                    orientation == TabsOrientation::Horizontal && layout != TabsLayout::Fit,
+                    |s| s.flex_grow(1.0).justify_center(),
+                )
+                .apply_if(
+                    orientation == TabsOrientation::Horizontal && layout == TabsLayout::FillEqual,
+                    |s| s.flex_basis(0.0),
+                )
                 .background(Color::TRANSPARENT)
                 .border_color(Color::TRANSPARENT)
                 .with_theme(|s, t| {
@@ -118,6 +134,7 @@ fn tabs_list(
     active: RwSignal<usize>,
     variant: TabsVariant,
     orientation: TabsOrientation,
+    layout: TabsLayout,
     items: [(&'static str, Option<&'static str>, bool); 3],
 ) -> AnyView {
     let triggers = (
@@ -128,6 +145,7 @@ fn tabs_list(
             active,
             variant,
             orientation,
+            layout,
             items[0].2,
         ),
         tabs_trigger(
@@ -137,6 +155,7 @@ fn tabs_list(
             active,
             variant,
             orientation,
+            layout,
             items[1].2,
         ),
         tabs_trigger(
@@ -146,27 +165,33 @@ fn tabs_list(
             active,
             variant,
             orientation,
+            layout,
             items[2].2,
         ),
     );
 
     match orientation {
         TabsOrientation::Horizontal => Stack::horizontal(triggers)
-            .style(move |s| match variant {
-                TabsVariant::Default => s
-                    .height(32.0)
-                    .items_center()
-                    .gap(0.0)
-                    .padding(3.0)
-                    .border_radius(8.0)
-                    .corner_smoothing(0.6)
-                    .with_theme(|s, t| s.background(t.muted()).color(t.muted_foreground())),
-                TabsVariant::Line => s
-                    .height(36.0)
-                    .items_center()
-                    .gap(4.0)
-                    .padding(0.0)
-                    .background(Color::TRANSPARENT),
+            .style(move |s| {
+                let s = match variant {
+                    TabsVariant::Default => s
+                        .height(32.0)
+                        .items_center()
+                        .gap(0.0)
+                        .padding(3.0)
+                        .border_radius(8.0)
+                        .corner_smoothing(0.6)
+                        .with_theme(|s, t| s.background(t.muted()).color(t.muted_foreground())),
+                    TabsVariant::Line => s
+                        .height(36.0)
+                        .items_center()
+                        .gap(4.0)
+                        .padding(0.0)
+                        .background(Color::TRANSPARENT),
+                };
+
+                s.apply_if(layout == TabsLayout::Fit, |s| s.flex_shrink(0.0))
+                    .apply_if(layout != TabsLayout::Fit, |s| s.width_full())
             })
             .into_any(),
         TabsOrientation::Vertical => Stack::vertical(triggers)
@@ -245,6 +270,8 @@ pub fn tab_view() -> impl IntoView {
     let default_tab = RwSignal::new(0usize);
     let line_tab = RwSignal::new(0usize);
     let icon_tab = RwSignal::new(0usize);
+    let fill_tab = RwSignal::new(0usize);
+    let equal_tab = RwSignal::new(0usize);
     let vertical_tab = RwSignal::new(0usize);
 
     Stack::vertical((
@@ -260,6 +287,7 @@ pub fn tab_view() -> impl IntoView {
                     default_tab,
                     TabsVariant::Default,
                     TabsOrientation::Horizontal,
+                    TabsLayout::Fit,
                     [
                         ("Account", None, false),
                         ("Password", None, false),
@@ -268,7 +296,7 @@ pub fn tab_view() -> impl IntoView {
                 ),
                 tabs_content(default_tab),
             ))
-            .style(|s| s.flex_col().gap(10.0).max_width(460.0)),
+            .style(|s| s.flex_col().items_start().gap(10.0).max_width(460.0)),
         ),
         section(
             "Line",
@@ -277,6 +305,7 @@ pub fn tab_view() -> impl IntoView {
                     line_tab,
                     TabsVariant::Line,
                     TabsOrientation::Horizontal,
+                    TabsLayout::Fit,
                     [
                         ("Preview", None, false),
                         ("Code", None, false),
@@ -285,7 +314,7 @@ pub fn tab_view() -> impl IntoView {
                 ),
                 tabs_content(line_tab),
             ))
-            .style(|s| s.flex_col().gap(10.0).max_width(460.0)),
+            .style(|s| s.flex_col().items_start().gap(10.0).max_width(460.0)),
         ),
         section(
             "Icons & Disabled",
@@ -294,6 +323,7 @@ pub fn tab_view() -> impl IntoView {
                     icon_tab,
                     TabsVariant::Default,
                     TabsOrientation::Horizontal,
+                    TabsLayout::Fit,
                     [
                         ("Overview", Some("layout-dashboard"), false),
                         ("Files", Some("folder"), false),
@@ -302,7 +332,43 @@ pub fn tab_view() -> impl IntoView {
                 ),
                 tabs_content(icon_tab),
             ))
-            .style(|s| s.flex_col().gap(10.0).max_width(460.0)),
+            .style(|s| s.flex_col().items_start().gap(10.0).max_width(460.0)),
+        ),
+        section(
+            "Full Width Proportional",
+            Stack::vertical((
+                tabs_list(
+                    fill_tab,
+                    TabsVariant::Default,
+                    TabsOrientation::Horizontal,
+                    TabsLayout::FillProportional,
+                    [
+                        ("Short", None, false),
+                        ("Longer Label", None, false),
+                        ("Activity", None, false),
+                    ],
+                ),
+                tabs_content(fill_tab),
+            ))
+            .style(|s| s.width(460.0).flex_col().gap(10.0)),
+        ),
+        section(
+            "Full Width Equal",
+            Stack::vertical((
+                tabs_list(
+                    equal_tab,
+                    TabsVariant::Default,
+                    TabsOrientation::Horizontal,
+                    TabsLayout::FillEqual,
+                    [
+                        ("Account", None, false),
+                        ("Password", None, false),
+                        ("Billing", None, false),
+                    ],
+                ),
+                tabs_content(equal_tab),
+            ))
+            .style(|s| s.width(460.0).flex_col().gap(10.0)),
         ),
         section(
             "Vertical",
@@ -311,6 +377,7 @@ pub fn tab_view() -> impl IntoView {
                     vertical_tab,
                     TabsVariant::Line,
                     TabsOrientation::Vertical,
+                    TabsLayout::Fit,
                     [
                         ("Profile", Some("user"), false),
                         ("Security", Some("shield"), false),

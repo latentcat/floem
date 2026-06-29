@@ -9,6 +9,8 @@ use floem::{
     views::{Button, Decorators},
 };
 
+use crate::shadcn_style::{fixed_square, wrap_text};
+
 #[derive(Clone, Copy)]
 enum AlertSize {
     Default,
@@ -52,7 +54,7 @@ fn destructive_button(label: &'static str) -> Button {
 fn media(icon_name: &'static str) -> AnyView {
     Stack::vertical((icon(icon_name, 24.0),))
         .style(|s| {
-            s.size(40.0, 40.0)
+            s.apply(fixed_square(40.0))
                 .items_center()
                 .justify_center()
                 .border_radius(8.0)
@@ -71,11 +73,13 @@ fn header(
     let title_text = title.style(|s| {
         s.font_size(16.0)
             .font_weight(FontWeight::MEDIUM)
+            .apply(wrap_text())
             .with_theme(|s, t| s.color(t.popover_foreground()))
     });
     let description_text = description.style(|s| {
         s.font_size(14.0)
             .line_height(1.4)
+            .apply(wrap_text())
             .with_theme(|s, t| s.color(t.muted_foreground()))
     });
 
@@ -83,15 +87,15 @@ fn header(
         (Some(name), AlertSize::Default) => Stack::horizontal((
             media(name),
             Stack::vertical((title_text, description_text))
-                .style(|s| s.flex_col().gap(6.0).flex_grow(1.0)),
+                .style(|s| s.flex_col().gap(6.0).flex_grow(1.0).min_width(0.0)),
         ))
         .style(|s| s.items_start().gap(14.0))
         .into_any(),
         (Some(name), AlertSize::Sm) => Stack::vertical((media(name), title_text, description_text))
-            .style(|s| s.items_center().gap(8.0))
+            .style(|s| s.width_full().items_center().gap(8.0).min_width(0.0))
             .into_any(),
         (None, _) => Stack::vertical((title_text, description_text))
-            .style(|s| s.flex_col().gap(6.0))
+            .style(|s| s.width_full().flex_col().gap(6.0).min_width(0.0))
             .into_any(),
     }
 }

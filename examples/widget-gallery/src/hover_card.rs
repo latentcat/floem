@@ -9,6 +9,8 @@ use floem::{
     views::{Button, Decorators},
 };
 
+use crate::shadcn_style::{fixed_square, text_column, wrap_text};
+
 fn icon(name: &'static str, size: f64) -> AnyView {
     icon_library::icon(IconLibrary::Lucide, name)
         .map(|icon| {
@@ -21,7 +23,7 @@ fn icon(name: &'static str, size: f64) -> AnyView {
 fn avatar(initials: &'static str, size: f64) -> AnyView {
     initials
         .style(move |s| {
-            s.size(size, size)
+            s.apply(fixed_square(size))
                 .items_center()
                 .justify_center()
                 .border_radius(100.0)
@@ -57,6 +59,7 @@ fn title(text: &'static str) -> AnyView {
     text.style(|s| {
         s.font_size(14.0)
             .font_weight(FontWeight::SEMI_BOLD)
+            .apply(wrap_text())
             .with_theme(|s, t| s.color(t.popover_foreground()))
     })
     .into_any()
@@ -66,6 +69,7 @@ fn description(text: &'static str) -> AnyView {
     text.style(|s| {
         s.font_size(13.0)
             .line_height(1.35)
+            .apply(wrap_text())
             .with_theme(|s, t| s.color(t.muted_foreground()))
     })
     .into_any()
@@ -91,7 +95,7 @@ fn profile_card() -> AnyView {
                 title("@shadcn"),
                 description("Design components for copy and paste."),
             ))
-            .style(|s| s.flex_col().gap(4.0)),
+            .style(|s| s.apply(text_column()).gap(4.0)),
         ))
         .style(|s| s.items_start().gap(10.0)),
         meta_row("calendar-days", "Joined December 2021"),
@@ -115,7 +119,7 @@ fn repository_card() -> AnyView {
         Stack::horizontal((
             icon("package", 18.0),
             Stack::vertical((title("ui"), description("Beautifully designed components.")))
-                .style(|s| s.flex_col().gap(3.0)),
+                .style(|s| s.apply(text_column()).gap(3.0)),
         ))
         .style(|s| s.items_start().gap(8.0)),
         Stack::horizontal((
@@ -135,7 +139,7 @@ fn file_card() -> AnyView {
                 title("button.tsx"),
                 description("Updated in the current preset."),
             ))
-            .style(|s| s.flex_col().gap(3.0)),
+            .style(|s| s.apply(text_column()).gap(3.0)),
         ))
         .style(|s| s.items_start().gap(8.0)),
         meta_row("clock", "Modified 2 hours ago"),
@@ -153,7 +157,7 @@ fn team_card() -> AnyView {
                 title("Design System"),
                 description("3 maintainers active this week."),
             ))
-            .style(|s| s.flex_col().gap(3.0).margin_left(2.0)),
+            .style(|s| s.apply(text_column()).gap(3.0).margin_left(2.0)),
         ))
         .style(|s| s.items_center()),
         meta_row("message-circle", "18 component updates reviewed"),

@@ -9,6 +9,8 @@ use floem::{
     views::{Button, Decorators},
 };
 
+use crate::shadcn_style::{text_column, wrap_text};
+
 fn icon(name: &'static str) -> AnyView {
     icon_library::icon(IconLibrary::Lucide, name)
         .map(|icon| {
@@ -33,8 +35,9 @@ fn accordion_item(
                 s.font_size(14.0)
                     .font_weight(FontWeight::MEDIUM)
                     .line_height(1.3)
+                    .flex_grow(1.0)
+                    .apply(wrap_text())
             }),
-            Empty::new().style(|s| s.flex_grow(1.0)),
             dyn_view(move || {
                 if is_open() {
                     icon("chevron-up")
@@ -60,6 +63,7 @@ fn accordion_item(
                 .min_height(42.0)
                 .items_start()
                 .justify_between()
+                .gap(12.0)
                 .padding_horiz(0.0)
                 .padding_vert(10.0)
                 .border(1.0)
@@ -83,12 +87,13 @@ fn accordion_item(
             s.padding_bottom(10.0)
                 .font_size(14.0)
                 .line_height(1.45)
+                .apply(wrap_text())
                 .with_theme(|s, t| s.color(t.muted_foreground()))
                 .apply_if(!is_open(), |s| s.display(Display::None))
         }),
     ))
     .style(|s| {
-        s.flex_col()
+        s.apply(text_column())
             .border_bottom(1.0)
             .with_theme(|s, t| s.border_color(t.border()))
     })

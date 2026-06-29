@@ -8,7 +8,7 @@ use floem::{
     views::{Button, Decorators},
 };
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum DayState {
     Default,
     Outside,
@@ -98,7 +98,93 @@ fn day(label: &'static str, state: DayState) -> AnyView {
         .into_any()
 }
 
-fn calendar_surface(title: &'static str, caption_dropdown: bool) -> AnyView {
+fn interactive_day(
+    label: &'static str,
+    state: DayState,
+    selected: RwSignal<&'static str>,
+) -> AnyView {
+    if matches!(state, DayState::Disabled | DayState::Hidden) {
+        return day(label, state);
+    }
+
+    Button::new(label)
+        .action(move || {
+            if !matches!(state, DayState::Outside) {
+                selected.set(label);
+            }
+        })
+        .style(move |s| {
+            let is_selected = selected.get() == label && !matches!(state, DayState::Outside);
+
+            s.size(32.0, 32.0)
+                .padding(0.0)
+                .items_center()
+                .justify_center()
+                .font_size(13.0)
+                .border(1.0)
+                .border_radius(8.0)
+                .corner_smoothing(0.6)
+                .transition(Background, Transition::linear(100.millis()))
+                .transition(Foreground, Transition::linear(100.millis()))
+                .with_theme(move |s, t| {
+                    if is_selected {
+                        return s
+                            .background(t.primary())
+                            .border_color(t.primary())
+                            .color(t.primary_foreground());
+                    }
+
+                    match state {
+                        DayState::Outside => s
+                            .background(t.def(|_| floem::peniko::Color::TRANSPARENT))
+                            .border_color(t.def(|_| floem::peniko::Color::TRANSPARENT))
+                            .color(t.muted_foreground()),
+                        DayState::Today => s
+                            .background(t.muted())
+                            .border_color(t.muted())
+                            .color(t.foreground())
+                            .hover(|s| s.background(t.muted())),
+                        DayState::RangeStart | DayState::RangeEnd => s
+                            .background(t.primary())
+                            .border_color(t.primary())
+                            .color(t.primary_foreground()),
+                        DayState::RangeMiddle => s
+                            .background(t.muted())
+                            .border_color(t.muted())
+                            .color(t.foreground())
+                            .border_radius(t.def(|_| 0.0)),
+                        DayState::Focused => s
+                            .background(t.def(|_| floem::peniko::Color::TRANSPARENT))
+                            .border_color(t.ring())
+                            .color(t.foreground())
+                            .outline(3.0)
+                            .outline_color(t.ring_focus()),
+                        _ => s
+                            .background(t.def(|_| floem::peniko::Color::TRANSPARENT))
+                            .border_color(t.def(|_| floem::peniko::Color::TRANSPARENT))
+                            .color(t.foreground())
+                            .hover(|s| s.background(t.muted())),
+                    }
+                })
+        })
+        .into_any()
+}
+
+fn calendar_cell(
+    label: &'static str,
+    state: DayState,
+    selected: Option<RwSignal<&'static str>>,
+) -> AnyView {
+    selected
+        .map(|selected| interactive_day(label, state, selected))
+        .unwrap_or_else(|| day(label, state))
+}
+
+fn calendar_surface(
+    title: &'static str,
+    caption_dropdown: bool,
+    selected: Option<RwSignal<&'static str>>,
+) -> AnyView {
     let weeks = [
         [
             ("29", DayState::Outside),
@@ -184,8 +270,10 @@ fn calendar_surface(title: &'static str, caption_dropdown: bool) -> AnyView {
         Stack::horizontal_from_iter(["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map(weekday))
             .style(|s| s.gap(2.0)),
         Stack::vertical_from_iter(weeks.map(|week| {
-            Stack::horizontal_from_iter(week.map(|(label, state)| day(label, state)))
-                .style(|s| s.gap(2.0))
+            Stack::horizontal_from_iter(
+                week.map(|(label, state)| calendar_cell(label, state, selected)),
+            )
+            .style(|s| s.gap(2.0))
         }))
         .style(|s| s.flex_col().gap(2.0)),
     ))
@@ -202,6 +290,8 @@ fn calendar_surface(title: &'static str, caption_dropdown: bool) -> AnyView {
 }
 
 pub fn calendar_view() -> impl IntoView {
+    let selected_day = RwSignal::new("14");
+
     Stack::vertical((
         "Calendar".style(|s| {
             s.font_size(20.0)
@@ -209,7 +299,7 @@ pub fn calendar_view() -> impl IntoView {
                 .with_theme(|s, t| s.color(t.foreground()))
         }),
         Stack::horizontal((
-            calendar_surface("July 2026", true),
+            calendar_surface("July 2026", true, Some(selected_day)),
             Stack::vertical((
                 "States".style(|s| {
                     s.font_size(14.0)
@@ -247,8 +337,8 @@ pub fn calendar_view() -> impl IntoView {
                         .with_theme(|s, t| s.color(t.foreground()))
                 }),
                 Stack::horizontal((
-                    calendar_surface("July 2026", false),
-                    calendar_surface("August 2026", false),
+                    calendar_surface("July 2026", false, None),
+                    calendar_surface("August 2026", false, None),
                 ))
                 .style(|s| s.items_start().gap(12.0)),
             ))

@@ -17,7 +17,16 @@ fn spinner(size: f64) -> AnyView {
             })
             .animation(|a| {
                 a.duration(1.seconds())
-                    .keyframe(0, |f| f.style(|s| s.rotate(0.0.deg())))
+                    .keyframe(0, |f| f.style(|s| s.rotate(0.0.deg())).ease(easing::Linear))
+                    .keyframe(25, |f| {
+                        f.style(|s| s.rotate(90.0.deg())).ease(easing::Linear)
+                    })
+                    .keyframe(50, |f| {
+                        f.style(|s| s.rotate(180.0.deg())).ease(easing::Linear)
+                    })
+                    .keyframe(75, |f| {
+                        f.style(|s| s.rotate(270.0.deg())).ease(easing::Linear)
+                    })
                     .keyframe(100, |f| {
                         f.style(|s| s.rotate(360.0.deg())).ease(easing::Linear)
                     })

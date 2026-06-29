@@ -611,8 +611,10 @@ impl<T: Clone + std::cmp::PartialEq + std::fmt::Debug> Dropdown<T> {
         let list = self.build_list_view();
         let list_id = list.id();
         exec_after_animation_frame(move |_| {
-            // we need to requet focus once the list has been styled and made visible or else it will not be considered focusable
-            list_id.request_focus();
+            // We need to request focus once the list has been styled and made visible or else it will not be considered focusable.
+            if list_id.try_root().is_some() {
+                list_id.request_focus();
+            }
         });
 
         let scroll = list.scroll().style(move |s| {

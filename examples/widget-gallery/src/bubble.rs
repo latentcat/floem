@@ -3,6 +3,8 @@ use floem::{
     views::Decorators,
 };
 
+use crate::shadcn_style::wrap_text;
+
 #[derive(Clone, Copy)]
 enum BubbleVariant {
     Default,
@@ -30,21 +32,31 @@ impl BubbleVariant {
 
 fn bubble(variant: BubbleVariant, align_end: bool, reactions: Option<&'static str>) -> AnyView {
     let content = Stack::vertical((
-        format!("{} bubble", variant.label()).style(|s| s.font_size(14.0).line_height(1.45)),
+        format!("{} bubble", variant.label()).style(|s| {
+            s.font_size(14.0)
+                .line_height(1.45)
+                .max_width(296.0)
+                .apply(wrap_text())
+        }),
         "Message content wraps inside a rounded shadcn surface.".style(move |s| {
-            s.font_size(13.0).line_height(1.4).with_theme(move |s, t| {
-                if matches!(variant, BubbleVariant::Default) {
-                    s.color(t.primary_foreground())
-                } else {
-                    s.color(t.muted_foreground())
-                }
-            })
+            s.font_size(13.0)
+                .line_height(1.4)
+                .max_width(296.0)
+                .apply(wrap_text())
+                .with_theme(move |s, t| {
+                    if matches!(variant, BubbleVariant::Default) {
+                        s.color(t.primary_foreground())
+                    } else {
+                        s.color(t.muted_foreground())
+                    }
+                })
         }),
     ))
     .style(move |s| {
         s.flex_col()
             .gap(2.0)
             .max_width(320.0)
+            .min_width(0.0)
             .padding_horiz(12.0)
             .padding_vert(8.0)
             .border(1.0)
@@ -110,6 +122,7 @@ fn bubble(variant: BubbleVariant, align_end: bool, reactions: Option<&'static st
         s.flex_col()
             .gap(4.0)
             .max_width(360.0)
+            .min_width(0.0)
             .apply_if(align_end, |s| s.items_end())
     })
     .into_any()

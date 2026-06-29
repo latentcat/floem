@@ -60,6 +60,7 @@ pub mod rich_text;
 pub mod scroll_area;
 pub mod select;
 pub mod separator;
+pub mod shadcn_style;
 pub mod sheet;
 pub mod skeleton;
 pub mod slider;
@@ -448,12 +449,14 @@ fn app_view(window_id: WindowId) -> impl IntoView {
                 })
         });
 
-    let tab = tab(
-        move || Some(active_tab.get().unwrap_or(0)),
-        move || tabs.get(),
-        |it| *it,
-        create_view,
-    )
+    let tab = dyn_view(move || {
+        let name = tabs.with(|tabs| {
+            tabs.get(active_tab.get().unwrap_or(0))
+                .copied()
+                .unwrap_or("Label")
+        });
+        create_view(name)
+    })
     .debug_name("Active Tab")
     .style(|s| s.flex_col().flex_grow(1.).items_start());
 

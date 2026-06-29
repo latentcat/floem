@@ -10,6 +10,12 @@ use floem::{
 
 use crate::form::{form, form_item};
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ViewMode {
+    List,
+    Grid,
+}
+
 fn group_icon(name: &'static str) -> AnyView {
     icon_library::icon(IconLibrary::Lucide, name)
         .map(|icon| icon.style(|s| s.size(16.0, 16.0)).into_any())
@@ -46,6 +52,9 @@ fn group_text(label: &'static str) -> AnyView {
                 .items_center()
                 .padding_horiz(10.0)
                 .border(1.0)
+                .border_top_left_radius(8.0)
+                .border_bottom_left_radius(8.0)
+                .corner_smoothing(0.6)
                 .font_size(14.0)
                 .font_weight(FontWeight::MEDIUM)
                 .with_theme(|s, t| {
@@ -65,7 +74,33 @@ fn vertical_separator() -> Empty {
     })
 }
 
+fn view_mode_button(
+    icon_name: &'static str,
+    label: &'static str,
+    value: ViewMode,
+    selected: RwSignal<ViewMode>,
+    radius: (f64, f64, f64, f64),
+) -> Button {
+    outline_group_button(
+        Stack::horizontal((group_icon(icon_name), label)).style(|s| s.items_center().gap(6.0)),
+        radius,
+    )
+    .action(move || selected.set(value))
+    .style(move |s| {
+        s.margin_left(-1.0).apply_if(selected.get() == value, |s| {
+            s.with_theme(|s, t| {
+                s.background(t.muted())
+                    .border_color(t.input())
+                    .color(t.foreground())
+                    .hover(|s| s.background(t.muted()))
+            })
+        })
+    })
+}
+
 pub fn button_group_view() -> impl IntoView {
+    let view_mode = RwSignal::new(ViewMode::List);
+
     form((
         form_item(
             "Horizontal:",
@@ -81,18 +116,20 @@ pub fn button_group_view() -> impl IntoView {
             Stack::horizontal((
                 group_text("View"),
                 vertical_separator(),
-                outline_group_button(
-                    Stack::horizontal((group_icon("list"), "List"))
-                        .style(|s| s.items_center().gap(6.0)),
+                view_mode_button(
+                    "list",
+                    "List",
+                    ViewMode::List,
+                    view_mode,
                     (0.0, 0.0, 0.0, 0.0),
-                )
-                .style(|s| s.margin_left(-1.0)),
-                outline_group_button(
-                    Stack::horizontal((group_icon("grid-2x2"), "Grid"))
-                        .style(|s| s.items_center().gap(6.0)),
+                ),
+                view_mode_button(
+                    "grid-2x2",
+                    "Grid",
+                    ViewMode::Grid,
+                    view_mode,
                     (0.0, 8.0, 8.0, 0.0),
-                )
-                .style(|s| s.margin_left(-1.0)),
+                ),
             ))
             .style(|s| s.items_center()),
         ),

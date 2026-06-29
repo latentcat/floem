@@ -899,6 +899,9 @@ impl ViewId {
 
     /// Request that this view gain the window focus
     pub fn request_focus(&self) {
+        if self.try_root().is_none() {
+            return;
+        }
         self.add_update_message(UpdateMessage::Focus(self.get_element_id()));
     }
 
