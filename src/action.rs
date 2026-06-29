@@ -165,8 +165,11 @@ impl TimerToken {
 pub fn exec_after(duration: Duration, action: impl FnOnce(TimerToken) + 'static) -> TimerToken {
     let view = get_current_view();
     let action = move |token| {
+        let Some(root) = view.try_root() else {
+            return;
+        };
         let current_view = get_current_view();
-        set_current_view(view.root());
+        set_current_view(root);
         action(token);
         set_current_view(current_view);
     };
@@ -196,8 +199,11 @@ pub fn exec_after_animation_frame(action: impl FnOnce(TimerToken) + 'static) -> 
     };
 
     let action = move |token| {
+        let Some(root) = view.try_root() else {
+            return;
+        };
         let current_view = get_current_view();
-        set_current_view(view.root());
+        set_current_view(root);
         action(token);
         set_current_view(current_view);
     };

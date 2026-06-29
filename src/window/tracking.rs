@@ -95,7 +95,8 @@ pub fn with_window_id_and_window<F: FnOnce(&WindowId, &Arc<dyn Window>) -> T, T>
     view: &ViewId,
     f: F,
 ) -> Option<T> {
-    with_window_map(|m| m.with_window_id_and_window(view.root(), f))
+    let root = view.try_root()?;
+    with_window_map(|m| m.with_window_id_and_window(root, f))
 }
 
 fn with_window_map_mut<F: FnOnce(&mut WindowMapping) -> T, T>(f: F) -> T {

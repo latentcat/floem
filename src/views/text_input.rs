@@ -88,7 +88,7 @@ struct BufferState {
 
 impl BufferState {
     fn update(&mut self, update: impl FnOnce(&mut String)) {
-        self.buffer.update(|s| {
+        let _ = self.buffer.try_update(|s| {
             let last = s.clone();
             update(s);
             self.last_buffer = last;
@@ -96,11 +96,14 @@ impl BufferState {
     }
 
     fn get_untracked(&self) -> String {
-        self.buffer.get_untracked()
+        self.buffer
+            .try_get_untracked()
+            .unwrap_or_else(|| self.last_buffer.clone())
     }
 
     fn with_untracked<T>(&self, f: impl FnOnce(&String) -> T) -> T {
-        self.buffer.with_untracked(f)
+        self.buffer
+            .try_with_untracked(|buffer| f(buffer.unwrap_or(&self.last_buffer)))
     }
 }
 
@@ -289,8 +292,10 @@ impl TextInput {
         let id = ViewId::new();
 
         Effect::new(move |_| {
-            buffer.track();
-            id.update_state(());
+            buffer.try_track();
+            if id.try_root().is_some() {
+                id.update_state(());
+            }
         });
 
         let mut text_input = Self {
@@ -1232,7 +1237,11 @@ impl View for TextInput {
         }
         if state.downcast::<()>().is_ok() {
             // Only update recomputation if the state has actually changed
-            let text_updated = self.buffer.buffer.with_untracked(|buf| {
+            let text_updated = self.buffer.buffer.try_with_untracked(|buf| {
+                let Some(buf) = buf else {
+                    return false;
+                };
+
                 let updated = *buf != self.buffer.last_buffer;
 
                 if updated {

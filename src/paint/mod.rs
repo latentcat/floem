@@ -14,7 +14,10 @@ pub use renderer::Renderer;
 
 use floem_renderer::Renderer as FloemRenderer;
 use floem_renderer::gpu_resources::{GpuResourceError, GpuResources};
-use peniko::kurbo::{Affine, Rect, RoundedRect, Shape, Size};
+use peniko::{
+    Mix,
+    kurbo::{Affine, Rect, RoundedRect, Shape, Size},
+};
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use understory_box_tree::NodeFlags;
@@ -311,6 +314,17 @@ impl GlobalPaintCx<'_> {
         if !is_post {
             if element_id.is_view() {
                 let state = view_state.borrow();
+                if let Some(opacity) =
+                    opacity_layer_alpha(state.view_style_props.opacity(), layout_rect)
+                {
+                    let layer_clip = layout_rect.inflate(256.0, 256.0);
+                    cx.paint_state.renderer_mut().push_layer(
+                        Mix::Normal,
+                        opacity,
+                        Affine::IDENTITY,
+                        &layer_clip,
+                    );
+                }
                 paint_bg(&mut cx, &state.view_style_props, layout_rect);
                 paint_border(
                     &mut cx,
@@ -350,6 +364,9 @@ impl GlobalPaintCx<'_> {
             if element_id.is_view() {
                 let state = view_state.borrow();
                 paint_outline(&mut cx, &state.view_style_props, layout_rect);
+                if opacity_layer_alpha(state.view_style_props.opacity(), layout_rect).is_some() {
+                    cx.paint_state.renderer_mut().pop_layer();
+                }
             }
         }
     }
@@ -357,6 +374,11 @@ impl GlobalPaintCx<'_> {
 
 fn finite_rect(rect: Rect) -> bool {
     rect.x0.is_finite() && rect.y0.is_finite() && rect.x1.is_finite() && rect.y1.is_finite()
+}
+
+fn opacity_layer_alpha(opacity: f32, rect: Rect) -> Option<f32> {
+    let opacity = opacity.clamp(0.0, 1.0);
+    (opacity < 1.0 && finite_rect(rect.inflate(256.0, 256.0))).then_some(opacity)
 }
 
 impl PaintCx<'_> {
@@ -435,8 +457,11 @@ impl PaintCx<'_> {
         };
 
         let action = move |token| {
+            let Some(root) = view.try_root() else {
+                return;
+            };
             let current_view = get_current_view();
-            set_current_view(view.root());
+            set_current_view(root);
             action(token);
             set_current_view(current_view);
         };

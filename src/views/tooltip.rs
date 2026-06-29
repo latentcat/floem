@@ -8,7 +8,7 @@ use ui_events::pointer::PointerEvent;
 use crate::{
     action::{TimerToken, add_overlay, exec_after, exec_after_animation_frame, remove_overlay},
     context::{EventCx, UpdateCx, VisualChangedListener},
-    event::{Event, EventPropagation, Phase},
+    event::{Event, EventPropagation, Phase, listener},
     platform::Duration,
     prop, prop_extractor, style_class,
     theme::StyleThemeExt,
@@ -159,6 +159,55 @@ fn refresh_tooltip_placement(
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn rect(x0: f64, y0: f64, x1: f64, y1: f64) -> Rect {
+        Rect { x0, y0, x1, y1 }
+    }
+
+    #[test]
+    fn placement_prefers_bottom_center_when_it_fits() {
+        let placement = compute_tooltip_placement(
+            rect(100.0, 100.0, 140.0, 130.0),
+            Size::new(80.0, 32.0),
+            Size::new(400.0, 300.0),
+        );
+
+        assert_eq!(placement.side, TooltipSide::Bottom);
+        assert_eq!(placement.left, 80.0);
+        assert_eq!(placement.top, 138.0);
+        assert_eq!(placement.arrow_left, 35.0);
+    }
+
+    #[test]
+    fn placement_flips_to_top_when_bottom_space_is_too_small() {
+        let placement = compute_tooltip_placement(
+            rect(100.0, 260.0, 140.0, 290.0),
+            Size::new(80.0, 40.0),
+            Size::new(400.0, 300.0),
+        );
+
+        assert_eq!(placement.side, TooltipSide::Top);
+        assert_eq!(placement.left, 80.0);
+        assert_eq!(placement.top, 212.0);
+    }
+
+    #[test]
+    fn placement_clamps_surface_and_arrow_inside_viewport() {
+        let placement = compute_tooltip_placement(
+            rect(4.0, 80.0, 24.0, 110.0),
+            Size::new(100.0, 32.0),
+            Size::new(160.0, 200.0),
+        );
+
+        assert_eq!(placement.side, TooltipSide::Bottom);
+        assert_eq!(placement.left, TOOLTIP_VIEWPORT_PADDING);
+        assert_eq!(placement.arrow_left, TOOLTIP_ARROW_EDGE_PADDING);
+    }
+}
+
 /// A view that displays a tooltip for its child.
 pub fn tooltip<V: IntoView + 'static, T: IntoView + 'static>(
     child: V,
@@ -232,8 +281,11 @@ impl Tooltip {
             return;
         }
 
+        let Some(root) = self.id.try_root() else {
+            return;
+        };
         let anchor = self.id.get_visual_rect();
-        let viewport = self.id.root().get_size().unwrap_or_default();
+        let viewport = root.get_size().unwrap_or_default();
         if anchor.width() <= 0.0 || anchor.height() <= 0.0 || viewport.width <= 0.0 {
             return;
         }

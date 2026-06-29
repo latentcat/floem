@@ -13,7 +13,7 @@ use crate::{
         BackdropBlur, Background, BorderBottomColor, BorderBottomLeftRadius,
         BorderBottomRightRadius, BorderLeftColor, BorderRightColor, BorderTopColor,
         BorderTopLeftRadius, BorderTopRightRadius, BoxShadowProp, CornerSmoothing, CursorStyle,
-        InheritedInteractionCx, LayoutProps, Outline, OutlineColor, Style, StyleClassRef,
+        InheritedInteractionCx, LayoutProps, Opacity, Outline, OutlineColor, Style, StyleClassRef,
         StyleSelectors, TransformProps, recalc::StyleReason,
     },
     view::LayoutTree,
@@ -94,6 +94,7 @@ prop_extractor! {
         pub border_bottom_color: BorderBottomColor,
         pub background: Background,
         pub backdrop_blur: BackdropBlur,
+        pub opacity: Opacity,
         pub corner_smoothing: CornerSmoothing,
         pub shadow: BoxShadowProp,
     }

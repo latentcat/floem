@@ -1,13 +1,13 @@
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
 use floem::{
-    AnyView, IntoView,
-    action::{TimerToken, exec_after, exec_after_animation_frame},
+    AnyView, HasViewId, IntoView, ViewId,
+    action::{TimerToken, add_overlay, exec_after, exec_after_animation_frame, remove_overlay},
     context::VisualChangedListener,
     kurbo::Rect,
     peniko::Color,
     prelude::*,
-    reactive::Effect,
+    reactive::{Effect, Scope},
     style::{BackdropBlur, Background, Opacity, ScaleX, ScaleY, Style, Transition, TranslateY},
     unit::UnitExt,
     views::{Decorators, Empty, Overlay},
@@ -30,7 +30,12 @@ impl PortalMotion {
                 present.set(true);
                 active.set(false);
                 let token = exec_after_animation_frame(move |_| {
-                    active.set(true);
+                    let token = exec_after_animation_frame(move |_| {
+                        active.set(true);
+                    });
+                    if token == TimerToken::INVALID {
+                        active.set(true);
+                    }
                 });
                 if token == TimerToken::INVALID {
                     active.set(true);
@@ -85,7 +90,7 @@ impl PortalPosition {
 }
 
 fn transition(duration: Duration) -> Transition {
-    Transition::linear(duration)
+    Transition::ease_in_out(duration)
 }
 
 pub fn portal_surface_motion(s: Style, motion: PortalMotion, duration: Duration) -> Style {
@@ -100,48 +105,89 @@ pub fn portal_surface_motion(s: Style, motion: PortalMotion, duration: Duration)
 }
 
 pub fn modal_portal(open: RwSignal<bool>, content: impl Fn() -> AnyView + 'static) -> AnyView {
-    let duration = 180.millis();
-    let motion = PortalMotion::new(open, duration);
+    let surface_duration = 160.millis();
+    let backdrop_duration = 180.millis();
+    let motion = PortalMotion::new(open, backdrop_duration);
     let content = Rc::new(content);
+    let host = Empty::new();
+    let host_id = host.id();
+    let overlay = Rc::new(RefCell::new(None::<(ViewId, Scope)>));
+    let build_content = Scope::current().enter_child(move |_| (content)());
 
-    Overlay::new_dyn(move || {
-        if !motion.present.get() {
-            return Empty::new().into_any();
+    Effect::new({
+        let overlay = overlay.clone();
+        move |_| {
+            if open.get() {
+                if overlay.borrow().is_some() {
+                    return;
+                }
+
+                let (content_view, content_scope) = build_content(());
+                let backdrop = Empty::new()
+                    .on_event_stop(listener::Click, move |_, _| open.set(false))
+                    .style(move |s| {
+                        let active = motion.is_active();
+                        s.absolute()
+                            .inset(0.0)
+                            .size_full()
+                            .backdrop_blur(if active { 16.0 } else { 0.0 })
+                            .background(Color::from_rgb8(0, 0, 0).with_alpha(if active {
+                                0.38
+                            } else {
+                                0.0
+                            }))
+                            .transition(BackdropBlur, transition(backdrop_duration))
+                            .transition(Background, transition(backdrop_duration))
+                    });
+
+                let surface = Stack::vertical((content_view,))
+                    .on_event_stop(listener::PointerDown, |_, _| {})
+                    .style(move |s| {
+                        let s = s.pointer_events_auto();
+                        portal_surface_motion(s, motion, surface_duration)
+                    });
+
+                let surface_layer = Stack::vertical((surface,)).style(|s| {
+                    s.absolute()
+                        .inset(0.0)
+                        .size_full()
+                        .items_center()
+                        .justify_center()
+                        .padding(24.0)
+                        .pointer_events_none()
+                });
+
+                let overlay_view = Stack::new((backdrop, surface_layer)).style(|s| {
+                    s.absolute()
+                        .inset(0.0)
+                        .size_full()
+                        .z_index(40)
+                        .pointer_events_auto()
+                });
+
+                let overlay_id = add_overlay(overlay_view);
+                overlay_id.set_style_parent(host_id);
+                *overlay.borrow_mut() = Some((overlay_id, content_scope));
+            } else if overlay.borrow().is_some() {
+                let overlay = overlay.clone();
+                exec_after(backdrop_duration, move |_| {
+                    if !open.get_untracked()
+                        && let Some((overlay_id, content_scope)) = overlay.borrow_mut().take()
+                    {
+                        remove_overlay(overlay_id);
+                        content_scope.dispose();
+                    }
+                });
+            }
         }
+    });
 
-        let active = motion.is_active();
-        let backdrop = Empty::new()
-            .on_event_stop(listener::Click, move |_, _| open.set(false))
-            .style(move |s| {
-                s.absolute()
-                    .inset(0.0)
-                    .opacity(if active { 1.0 } else { 0.0 })
-                    .backdrop_blur(if active { 8.0 } else { 0.0 })
-                    .background(Color::from_rgb8(0, 0, 0).with_alpha(if active {
-                        0.42
-                    } else {
-                        0.0
-                    }))
-                    .transition(Opacity, transition(duration))
-                    .transition(BackdropBlur, transition(duration))
-                    .transition(Background, transition(duration))
-            });
-
-        let surface = Stack::vertical(((content)(),)).style(move |s| {
-            let s = s
-                .absolute()
-                .inset(0.0)
-                .items_center()
-                .justify_center()
-                .padding(24.0);
-            portal_surface_motion(s, motion, duration)
-        });
-
-        Stack::new((backdrop, surface))
-            .style(|s| s.absolute().inset(0.0).z_index(40))
-            .into_any()
+    host.on_cleanup(move || {
+        if let Some((overlay_id, content_scope)) = overlay.borrow_mut().take() {
+            remove_overlay(overlay_id);
+            content_scope.dispose();
+        }
     })
-    .style(|s| s.absolute().inset(0.0).z_index(40))
     .into_any()
 }
 
@@ -155,6 +201,33 @@ pub fn anchored_portal(
     let motion = PortalMotion::new(open, duration);
     let anchor = RwSignal::new(Rect::ZERO);
     let content = Rc::new(content);
+
+    let trigger = trigger.into_intermediate();
+    let trigger_id = trigger.view_id();
+
+    Effect::new(move |_| {
+        if open.get() {
+            let rect = trigger_id.get_visual_rect();
+            if rect.width() > 0.0 || rect.height() > 0.0 {
+                anchor.set(rect);
+            }
+
+            let token = exec_after_animation_frame(move |_| {
+                if trigger_id.is_valid() {
+                    let rect = trigger_id.get_visual_rect();
+                    if rect.width() > 0.0 || rect.height() > 0.0 {
+                        anchor.set(rect);
+                    }
+                }
+            });
+            if token == TimerToken::INVALID {
+                let rect = trigger_id.get_visual_rect();
+                if rect.width() > 0.0 || rect.height() > 0.0 {
+                    anchor.set(rect);
+                }
+            }
+        }
+    });
 
     let trigger = trigger
         .on_event_stop(VisualChangedListener, move |_, visual| {
@@ -198,7 +271,12 @@ pub fn anchored_portal(
             .style(|s| s.absolute().inset(0.0).z_index(30))
             .into_any()
     })
-    .style(|s| s.absolute().inset(0.0).z_index(30));
+    .style(move |s| {
+        s.absolute()
+            .inset(0.0)
+            .z_index(30)
+            .apply_if(!motion.present.get(), |s| s.pointer_events_none())
+    });
 
     Stack::new((trigger, overlay)).into_any()
 }

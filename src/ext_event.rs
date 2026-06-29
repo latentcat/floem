@@ -107,8 +107,12 @@ pub fn create_ext_action<T: Send + 'static>(
                 trigger.track();
                 if let Some(event) = data.lock().take() {
                     Effect::untrack(|| {
+                        let Some(root) = view.try_root() else {
+                            cx.dispose();
+                            return;
+                        };
                         let current_view = get_current_view();
-                        set_current_view(view.root());
+                        set_current_view(root);
                         let action = action.take().unwrap();
                         action(event);
                         set_current_view(current_view);
