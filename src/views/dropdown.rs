@@ -208,10 +208,13 @@ pub struct Dropdown<T: 'static> {
     style: DropdownStyle,
     index_to_item: OrdMap<usize, T>,
     width: RwSignal<f64>,
+    pending_open: bool,
+    open_requested: bool,
 }
 
 enum Message {
     OpenState(bool),
+    RetryOpen,
     ActiveElement(Box<dyn Any>),
     ListFocusLost,
     ListSelect(Box<dyn Any>),
@@ -235,8 +238,18 @@ impl<T: 'static + Clone + PartialEq + core::fmt::Debug> View for Dropdown<T> {
     fn update(&mut self, cx: &mut crate::context::UpdateCx, state: Box<dyn std::any::Any>) {
         if let Ok(state) = state.downcast::<Message>() {
             match *state {
-                Message::OpenState(true) => self.open_dropdown(),
+                Message::OpenState(true) => {
+                    self.open_requested = true;
+                    self.open_dropdown();
+                }
+                Message::RetryOpen => {
+                    self.pending_open = false;
+                    if self.open_requested {
+                        self.open_dropdown();
+                    }
+                }
                 Message::OpenState(false) => {
+                    self.open_requested = false;
                     if let Some(overlay_id) = self.overlay_id
                         && cx.window_state.is_focused(overlay_id)
                     {
@@ -284,6 +297,13 @@ impl<T: 'static + Clone + PartialEq + core::fmt::Debug> View for Dropdown<T> {
         if let Some(new_vis) = VisualChangedListener::extract(&cx.event) {
             self.window_origin = Some(new_vis.new_visual_aabb.origin());
             self.width.set(new_vis.new_visual_aabb.width());
+            if self.open_requested
+                && self.overlay_id.is_none()
+                && new_vis.new_visual_aabb.width() > 0.0
+            {
+                self.pending_open = false;
+                self.open_dropdown();
+            }
         }
 
         if cx.event.is_pointer_down()
@@ -405,6 +425,8 @@ impl<T: Clone + std::cmp::PartialEq + std::fmt::Debug> Dropdown<T> {
             window_origin: None,
             style: Default::default(),
             width: RwSignal::new(0.),
+            pending_open: false,
+            open_requested: false,
         }
         .class(DropdownClass)
     }
@@ -536,6 +558,7 @@ impl<T: Clone + std::cmp::PartialEq + std::fmt::Debug> Dropdown<T> {
         if self.overlay_id.is_some() {
             self.close_dropdown();
         } else {
+            self.open_requested = true;
             self.open_dropdown();
         }
     }
@@ -551,13 +574,32 @@ impl<T: Clone + std::cmp::PartialEq + std::fmt::Debug> Dropdown<T> {
     }
 
     fn open_dropdown(&mut self) {
-        if self.overlay_id.is_none() {
-            self.create_overlay();
-            self.dispatch_open_changed(true);
+        if self.overlay_id.is_some() {
+            return;
         }
+
+        let anchor_rect = self.id.get_visual_rect();
+        if anchor_rect.width() <= 0.0 || self.width.get_untracked() <= 0.0 {
+            if !self.pending_open {
+                self.pending_open = true;
+                let id = self.id;
+                exec_after_animation_frame(move |_| {
+                    if id.try_root().is_some() {
+                        id.update_state(Message::RetryOpen);
+                    }
+                });
+            }
+            return;
+        }
+
+        self.pending_open = false;
+        self.create_overlay();
+        self.dispatch_open_changed(true);
     }
 
     fn close_dropdown(&mut self) {
+        self.open_requested = false;
+        self.pending_open = false;
         if let Some(id) = self.overlay_id.take() {
             remove_overlay(id);
             self.dispatch_open_changed(false);

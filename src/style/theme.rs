@@ -324,7 +324,11 @@ impl DesignSystem {
     }
 
     pub fn input_muted(&self) -> Color {
-        self.input.with_alpha(if self.is_dark { 0.9 } else { 0.5 })
+        if self.is_dark {
+            Color::from_rgb8(255, 255, 255).with_alpha(0.08)
+        } else {
+            self.input.with_alpha(0.5)
+        }
     }
 
     pub fn input_background(&self) -> Color {
@@ -337,7 +341,7 @@ impl DesignSystem {
 
     pub fn input_disabled_background(&self) -> Color {
         if self.is_dark {
-            Color::from_rgb8(255, 255, 255).with_alpha(0.12)
+            Color::from_rgb8(255, 255, 255).with_alpha(0.06)
         } else {
             self.input.with_alpha(0.5)
         }
@@ -1265,15 +1269,7 @@ pub(crate) fn default_theme(os_theme: winit::window::Theme) -> Style {
                     s.background(t.input_background())
                         .border_color(t.input())
                         .color(t.foreground())
-                        .hover(|s| {
-                            s.background(t.def(|t| {
-                                if t.is_dark {
-                                    t.input.with_alpha(0.5)
-                                } else {
-                                    css::TRANSPARENT
-                                }
-                            }))
-                        })
+                        .hover(|s| s.background(t.input_background()))
                         .disabled(|s| s.set(Opacity, 0.5).unset_cursor())
                 })
                 .selectable(false)
@@ -1327,8 +1323,7 @@ pub(crate) fn default_theme(os_theme: winit::window::Theme) -> Style {
                         .items_center()
                         .class(ListItemClass, move |s| {
                             s.min_height(28.0)
-                                .padding_horiz(6.0)
-                                .padding_vert(4.0)
+                                .padding(6.0)
                                 .border_radius(6.0)
                                 .font_size(14.0)
                                 .selectable(false)

@@ -3,10 +3,12 @@ use floem::{
     views::Decorators,
 };
 
+use crate::shadcn_style::{fixed_square, wrap_text};
+
 fn avatar(initials: &'static str) -> AnyView {
     initials
         .style(|s| {
-            s.size(32.0, 32.0)
+            s.apply(fixed_square(32.0))
                 .items_center()
                 .justify_center()
                 .border_radius(999.0)
@@ -24,6 +26,7 @@ fn avatar(initials: &'static str) -> AnyView {
 fn bubble(text: &'static str, outgoing: bool) -> AnyView {
     text.style(move |s| {
         s.max_width(340.0)
+            .min_width(0.0)
             .padding_horiz(12.0)
             .padding_vert(8.0)
             .border(1.0)
@@ -31,6 +34,7 @@ fn bubble(text: &'static str, outgoing: bool) -> AnyView {
             .corner_smoothing(0.6)
             .font_size(14.0)
             .line_height(1.45)
+            .apply(wrap_text())
             .with_theme(move |s, t| {
                 if outgoing {
                     s.background(t.primary())
@@ -61,10 +65,12 @@ fn message(
                 name.style(|s| {
                     s.font_size(12.0)
                         .font_weight(FontWeight::MEDIUM)
+                        .apply(wrap_text())
                         .with_theme(|s, t| s.color(t.muted_foreground()))
                 }),
                 time.style(|s| {
                     s.font_size(12.0)
+                        .flex_shrink(0.0)
                         .with_theme(|s, t| s.color(t.muted_foreground()))
                 }),
             ))
@@ -72,6 +78,7 @@ fn message(
                 s.items_center()
                     .gap(8.0)
                     .padding_horiz(12.0)
+                    .min_width(0.0)
                     .apply_if(outgoing, |s| s.justify_end())
             }),
             bubble(text, outgoing),
@@ -79,6 +86,7 @@ fn message(
                 s.font_size(12.0)
                     .font_weight(FontWeight::MEDIUM)
                     .padding_horiz(12.0)
+                    .apply(wrap_text())
                     .with_theme(|s, t| s.color(t.muted_foreground()))
             }),
         ))
@@ -91,6 +99,7 @@ fn message(
     ))
     .style(move |s| {
         s.width_full()
+            .min_width(0.0)
             .gap(8.0)
             .items_end()
             .apply_if(outgoing, |s| s.flex_direction(FlexDirection::RowReverse))
@@ -133,6 +142,7 @@ pub fn message_view() -> impl IntoView {
         ))
         .style(|s| {
             s.width(620.0)
+                .max_width_full()
                 .flex_col()
                 .gap(18.0)
                 .padding(18.0)

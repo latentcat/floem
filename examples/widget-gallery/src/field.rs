@@ -6,6 +6,8 @@ use floem::{
     views::{Decorators, TextInput},
 };
 
+use crate::shadcn_style::{text_column, wrap_text};
+
 fn label_text(text: &'static str) -> AnyView {
     text.style(|s| {
         s.font_size(14.0)
@@ -19,6 +21,7 @@ fn description(text: &'static str) -> AnyView {
     text.style(|s| {
         s.font_size(14.0)
             .line_height(1.45)
+            .apply(wrap_text())
             .with_theme(|s, t| s.color(t.muted_foreground()))
     })
     .into_any()
@@ -60,10 +63,10 @@ fn horizontal_field() -> AnyView {
             label_text("Workspace"),
             description("Shown in your organization switcher."),
         ))
-        .style(|s| s.width(180.0).gap(4.0)),
+        .style(|s| s.width(180.0).apply(text_column()).gap(4.0)),
         field_input("Acme Inc.", false),
     ))
-    .style(|s| s.items_start().gap(16.0))
+    .style(|s| s.items_start().gap(16.0).min_width(0.0))
     .into_any()
 }
 
@@ -87,6 +90,7 @@ fn separator(label: &'static str) -> AnyView {
         label.style(|s| {
             s.padding_horiz(8.0)
                 .font_size(14.0)
+                .flex_shrink(0.0)
                 .with_theme(|s, t| s.background(t.background()).color(t.muted_foreground()))
         }),
         Empty::new().style(|s| {

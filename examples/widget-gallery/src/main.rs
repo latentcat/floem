@@ -52,6 +52,7 @@ pub mod native_select;
 pub mod navigation_menu;
 pub mod pagination;
 pub mod popover;
+pub mod portal;
 pub mod progress;
 pub mod radio_buttons;
 pub mod render_test_common;
@@ -77,6 +78,7 @@ pub mod tooltip;
 pub mod wgpu_render_test;
 
 use floem::{
+    AnyView,
     action::{set_theme, set_window_menu, toggle_global_theme, toggle_window_theme},
     kurbo::Size,
     menu::*,
@@ -153,85 +155,175 @@ fn theme_mode_button(
         })
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum GallerySection {
+    Component,
+    Scenario,
+}
+
+#[derive(Clone, Copy)]
+struct GalleryEntry {
+    name: &'static str,
+    section: GallerySection,
+}
+
+impl GalleryEntry {
+    const fn component(name: &'static str) -> Self {
+        Self {
+            name,
+            section: GallerySection::Component,
+        }
+    }
+
+    const fn scenario(name: &'static str) -> Self {
+        Self {
+            name,
+            section: GallerySection::Scenario,
+        }
+    }
+}
+
+fn sidebar_item(entry: GalleryEntry, index: usize, active_tab: RwSignal<usize>) -> AnyView {
+    entry
+        .name
+        .style(move |s| {
+            s.font_size(14.0)
+                .height(32.0)
+                .width_full()
+                .padding_horiz(10.0)
+                .items_center()
+                .border_radius(8.0)
+                .selectable(false)
+                .transition(Background, Transition::ease_in_out(100.millis()))
+                .with_theme(|s, t| s.color(t.sidebar_foreground()))
+                .apply_if(active_tab.get() == index, |s| {
+                    s.with_theme(|s, t| {
+                        s.background(t.sidebar_accent())
+                            .color(t.sidebar_foreground())
+                            .hover(|s| s.background(t.sidebar_accent()))
+                    })
+                })
+                .hover(|s| {
+                    s.cursor(CursorStyle::Pointer).with_theme(|s, t| {
+                        s.background(t.sidebar_accent())
+                            .color(t.sidebar_foreground())
+                    })
+                })
+        })
+        .on_event_stop(listener::Click, move |_, _| active_tab.set(index))
+        .into_any()
+}
+
+fn sidebar_group(
+    title: &'static str,
+    section: GallerySection,
+    entries: &[GalleryEntry],
+    active_tab: RwSignal<usize>,
+) -> AnyView {
+    Stack::vertical((
+        title.style(|s| {
+            s.padding_left(10.0)
+                .padding_right(10.0)
+                .padding_top(8.0)
+                .padding_bottom(4.0)
+                .font_size(12.0)
+                .font_weight(floem::text::FontWeight::SEMI_BOLD)
+                .selectable(false)
+                .with_theme(|s, t| s.color(t.muted_foreground()))
+        }),
+        Stack::vertical_from_iter(
+            entries
+                .iter()
+                .copied()
+                .enumerate()
+                .filter(move |(_, entry)| entry.section == section)
+                .map(move |(idx, entry)| sidebar_item(entry, idx, active_tab)),
+        )
+        .style(|s| s.flex_col().gap(2.0)),
+    ))
+    .style(|s| s.flex_col().gap(2.0).width_full())
+    .into_any()
+}
+
 fn app_view(window_id: WindowId) -> impl IntoView {
     let theme_mode = RwSignal::new(GalleryThemeMode::System);
-    let tabs: Vec<&'static str> = vec![
-        "Label",
-        "Button",
-        "Accordion",
-        "Badge",
-        "Alert",
-        "Alert Dialog",
-        "Attachment",
-        "Avatar",
-        "Aspect Ratio",
-        "Breadcrumb",
-        "Bubble",
-        "Button Group",
-        "Calendar",
-        "Carousel",
-        "Combobox",
-        "Command",
-        "Collapsible",
-        "Context Menu",
-        "Dialog",
-        "Direction",
-        "Drawer",
-        "Dropdown Menu",
-        "Empty",
-        "Field",
-        "Hover Card",
-        "Input OTP",
-        "Input Group",
-        "Item",
-        "Kbd",
-        "Marker",
-        "Menubar",
-        "Message",
-        "Message Scroller",
-        "Native Select",
-        "Navigation Menu",
-        "Pagination",
-        "Popover",
-        "Switch",
-        "Icon",
-        "Card",
-        "Chart",
-        "Scroll Area",
-        "Select",
-        "Separator",
-        "Sheet",
-        "Skeleton",
-        "Progress",
-        "Resizable",
-        "Spinner",
-        "Sonner",
-        "Table",
-        "Textarea",
-        "Toggle",
-        "Toggle Group",
-        "Tooltip",
-        "Input",
-        "Text Editor",
-        "Lists",
-        "Image",
-        "Background Blur",
-        "Corner Smoothing",
-        "WGPU Render Test",
-        "Bevy Render Test",
-        "Dropdown",
-        "Checkbox",
-        "Radio",
-        "Tabs",
-        "Slider",
-        "Canvas",
-        "Menu",
-        "Rich Text",
-        "Clipboard",
-        "Animation",
-        "Draggable",
-        "Dropped File",
-        "Files",
+    let entries: Vec<GalleryEntry> = vec![
+        GalleryEntry::component("Label"),
+        GalleryEntry::component("Button"),
+        GalleryEntry::component("Accordion"),
+        GalleryEntry::component("Badge"),
+        GalleryEntry::component("Alert"),
+        GalleryEntry::component("Alert Dialog"),
+        GalleryEntry::component("Attachment"),
+        GalleryEntry::component("Avatar"),
+        GalleryEntry::component("Aspect Ratio"),
+        GalleryEntry::component("Breadcrumb"),
+        GalleryEntry::component("Bubble"),
+        GalleryEntry::component("Button Group"),
+        GalleryEntry::component("Calendar"),
+        GalleryEntry::component("Carousel"),
+        GalleryEntry::component("Combobox"),
+        GalleryEntry::component("Command"),
+        GalleryEntry::component("Collapsible"),
+        GalleryEntry::component("Context Menu"),
+        GalleryEntry::component("Dialog"),
+        GalleryEntry::component("Direction"),
+        GalleryEntry::component("Drawer"),
+        GalleryEntry::component("Dropdown Menu"),
+        GalleryEntry::component("Empty"),
+        GalleryEntry::component("Field"),
+        GalleryEntry::component("Hover Card"),
+        GalleryEntry::component("Input OTP"),
+        GalleryEntry::component("Input Group"),
+        GalleryEntry::component("Item"),
+        GalleryEntry::component("Kbd"),
+        GalleryEntry::component("Marker"),
+        GalleryEntry::component("Menubar"),
+        GalleryEntry::component("Message"),
+        GalleryEntry::component("Native Select"),
+        GalleryEntry::component("Navigation Menu"),
+        GalleryEntry::component("Pagination"),
+        GalleryEntry::component("Popover"),
+        GalleryEntry::component("Switch"),
+        GalleryEntry::component("Icon"),
+        GalleryEntry::component("Card"),
+        GalleryEntry::component("Chart"),
+        GalleryEntry::component("Scroll Area"),
+        GalleryEntry::component("Select"),
+        GalleryEntry::component("Separator"),
+        GalleryEntry::component("Sheet"),
+        GalleryEntry::component("Skeleton"),
+        GalleryEntry::component("Progress"),
+        GalleryEntry::component("Resizable"),
+        GalleryEntry::component("Spinner"),
+        GalleryEntry::component("Sonner"),
+        GalleryEntry::component("Table"),
+        GalleryEntry::component("Textarea"),
+        GalleryEntry::component("Toggle"),
+        GalleryEntry::component("Toggle Group"),
+        GalleryEntry::component("Tooltip"),
+        GalleryEntry::component("Input"),
+        GalleryEntry::component("Text Editor"),
+        GalleryEntry::component("Lists"),
+        GalleryEntry::component("Dropdown"),
+        GalleryEntry::component("Checkbox"),
+        GalleryEntry::component("Radio"),
+        GalleryEntry::component("Tabs"),
+        GalleryEntry::component("Slider"),
+        GalleryEntry::scenario("Message Scroller"),
+        GalleryEntry::scenario("Image"),
+        GalleryEntry::scenario("Background Blur"),
+        GalleryEntry::scenario("Corner Smoothing"),
+        GalleryEntry::scenario("WGPU Render Test"),
+        GalleryEntry::scenario("Bevy Render Test"),
+        GalleryEntry::scenario("Canvas"),
+        GalleryEntry::scenario("Menu"),
+        GalleryEntry::scenario("Rich Text"),
+        GalleryEntry::scenario("Clipboard"),
+        GalleryEntry::scenario("Animation"),
+        GalleryEntry::scenario("Draggable"),
+        GalleryEntry::scenario("Dropped File"),
+        GalleryEntry::scenario("Files"),
     ];
 
     let create_view = |it: &str| {
@@ -318,64 +410,25 @@ fn app_view(window_id: WindowId) -> impl IntoView {
         .debug_name(it.to_string())
     };
 
-    let tabs = RwSignal::new(tabs);
+    let entries = RwSignal::new(entries);
+    let active_tab = RwSignal::new(0usize);
+    let side_bar_content = Stack::vertical((
+        sidebar_group(
+            "Components",
+            GallerySection::Component,
+            &entries.get_untracked(),
+            active_tab,
+        ),
+        sidebar_group(
+            "Scenarios",
+            GallerySection::Scenario,
+            &entries.get_untracked(),
+            active_tab,
+        ),
+    ))
+    .style(|s| s.flex_col().width_full().gap(8.0));
 
-    let side_bar_list = tabs
-        .get()
-        .into_iter()
-        .map(move |item| {
-            item.style(move |s| {
-                s.font_size(14.)
-                    .height(32.0)
-                    .width_full()
-                    .padding_horiz(10.0)
-                    .items_center()
-                    .transition(Background, Transition::ease_in_out(100.millis()))
-                    .with_theme(|s, t| s.color(t.sidebar_foreground()))
-                    .active(|s| {
-                        s.with_theme(|s, t| {
-                            s.background(t.sidebar_accent())
-                                .color(t.sidebar_foreground())
-                                .hover(|s| s.background(t.sidebar_accent()))
-                                .border_radius(t.border_radius())
-                        })
-                    })
-                    .selected(|s| {
-                        s.with_theme(|s, t| {
-                            s.background(t.sidebar_accent())
-                                .color(t.sidebar_foreground())
-                                .hover(|s| s.background(t.sidebar_accent()))
-                                .border_radius(t.border_radius())
-                        })
-                    })
-                    .hover(|s| {
-                        s.cursor(CursorStyle::Pointer).with_theme(|s, t| {
-                            s.background(t.sidebar_accent())
-                                .color(t.sidebar_foreground())
-                        })
-                    })
-            })
-        })
-        .list()
-        .style(|s| {
-            s.flex_col()
-                .width_full()
-                .flex_grow(1.)
-                .gap(2.0)
-                .class(ListItemClass, |s| {
-                    s.selected(|s| {
-                        s.with_theme(|s, t| {
-                            s.background(t.sidebar_accent())
-                                .color(t.sidebar_foreground())
-                                .hover(|s| s.background(t.sidebar_accent()))
-                        })
-                    })
-                })
-        });
-
-    let active_tab = side_bar_list.selection();
-
-    let side_tab_bar = side_bar_list
+    let side_tab_bar = side_bar_content
         .scroll()
         .debug_name("Side Tab Bar")
         .custom_style(|s| s.shrink_to_fit())
@@ -409,7 +462,8 @@ fn app_view(window_id: WindowId) -> impl IntoView {
 
     let new_window_button = Button::new("Open In Window")
         .action(move || {
-            let name = tabs.with(|tabs| tabs.get(active_tab.get().unwrap_or(0)).copied());
+            let name =
+                entries.with(|entries| entries.get(active_tab.get()).map(|entry| entry.name));
             new_window(
                 move |_| {
                     create_view(name.unwrap_or_default())
@@ -450,9 +504,10 @@ fn app_view(window_id: WindowId) -> impl IntoView {
         });
 
     let tab = dyn_view(move || {
-        let name = tabs.with(|tabs| {
-            tabs.get(active_tab.get().unwrap_or(0))
-                .copied()
+        let name = entries.with(|entries| {
+            entries
+                .get(active_tab.get())
+                .map(|entry| entry.name)
                 .unwrap_or("Label")
         });
         create_view(name)
@@ -505,9 +560,10 @@ fn app_view(window_id: WindowId) -> impl IntoView {
     };
 
     let widget_submenu = |m: SubMenu| {
-        tabs.with(|tabs| {
-            tabs.iter().enumerate().fold(m, |menu, (idx, &tab)| {
-                menu.item(tab, move |i| i.action(move || active_tab.set(Some(idx))))
+        entries.with(|entries| {
+            entries.iter().enumerate().fold(m, |menu, (idx, entry)| {
+                let name = entry.name;
+                menu.item(name, move |i| i.action(move || active_tab.set(idx)))
             })
         })
     };
@@ -523,19 +579,19 @@ fn app_view(window_id: WindowId) -> impl IntoView {
         .separator()
         .item("Next Tab", |i| {
             i.action(move || {
-                let current = active_tab.get().unwrap_or(0);
-                let tab_count = tabs.get().len();
-                active_tab.set(Some((current + 1) % tab_count));
+                let current = active_tab.get();
+                let tab_count = entries.get().len();
+                active_tab.set((current + 1) % tab_count);
             })
         })
         .item("Previous Tab", |i| {
             i.action(move || {
-                let current = active_tab.get().unwrap_or(0);
-                let tab_count = tabs.get().len();
+                let current = active_tab.get();
+                let tab_count = entries.get().len();
                 active_tab.set(if current == 0 {
-                    Some(tab_count - 1)
+                    tab_count - 1
                 } else {
-                    Some(current - 1)
+                    current - 1
                 });
             })
         })
@@ -557,7 +613,8 @@ fn app_view(window_id: WindowId) -> impl IntoView {
     let window_submenu = |m: SubMenu| {
         m.item("Open Current Tab in New Window", |i| {
             i.action(move || {
-                let name = tabs.with(|tabs| tabs.get(active_tab.get().unwrap_or(0)).copied());
+                let name =
+                    entries.with(|entries| entries.get(active_tab.get()).map(|entry| entry.name));
                 new_window(
                     move |_| {
                         create_view(name.unwrap_or_default())

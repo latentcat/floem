@@ -1,5 +1,7 @@
 use floem::{
-    AnyView, IntoView, easing,
+    AnyView, IntoView,
+    animate::Animation,
+    easing,
     icons::{self as icon_library, IconLibrary},
     prelude::*,
     style::Opacity,
@@ -96,16 +98,25 @@ fn state_icon(state: AttachmentState) -> AnyView {
                 state,
                 AttachmentState::Uploading | AttachmentState::Processing
             ) {
-                styled
-                    .animation(|a| {
-                        a.duration(1.seconds())
-                            .keyframe(0, |f| f.style(|s| s.rotate(0.0.deg())))
-                            .keyframe(100, |f| {
-                                f.style(|s| s.rotate(360.0.deg())).ease(easing::Linear)
-                            })
-                            .repeat(true)
-                    })
-                    .into_any()
+                let spin = RwSignal::new(
+                    Animation::new()
+                        .duration(1.seconds())
+                        .keyframe(0, |f| f.style(|s| s.rotate(0.0.deg())).ease(easing::Linear))
+                        .keyframe(25, |f| {
+                            f.style(|s| s.rotate(90.0.deg())).ease(easing::Linear)
+                        })
+                        .keyframe(50, |f| {
+                            f.style(|s| s.rotate(180.0.deg())).ease(easing::Linear)
+                        })
+                        .keyframe(75, |f| {
+                            f.style(|s| s.rotate(270.0.deg())).ease(easing::Linear)
+                        })
+                        .keyframe(100, |f| {
+                            f.style(|s| s.rotate(360.0.deg())).ease(easing::Linear)
+                        })
+                        .repeat(true),
+                );
+                styled.animation(move |_| spin.get()).into_any()
             } else {
                 styled.into_any()
             }
@@ -166,12 +177,13 @@ fn attachment(
         s.flex_col()
             .gap(2.0)
             .min_width(0.0)
-            .apply_if(vertical, |s| s.width(120.0).padding_horiz(4.0))
+            .apply_if(vertical, |s| s.width_full())
             .apply_if(!vertical, |s| s.flex_grow(1.0))
     });
 
     let media = Stack::vertical((state_icon(state),)).style(move |s| {
         s.size(media_size, media_size)
+            .flex_shrink(0.0)
             .items_center()
             .justify_center()
             .border_radius(if matches!(size, AttachmentSize::Xs) {
@@ -213,7 +225,7 @@ fn attachment(
             .border(1.0)
             .border_radius(size.radius())
             .corner_smoothing(0.6)
-            .apply_if(vertical, |s| s.flex_col().items_start())
+            .apply_if(vertical, |s| s.flex_col().items_stretch())
             .with_theme(move |s, t| {
                 let border = if matches!(state, AttachmentState::Error) {
                     t.def(|t| t.danger().with_alpha(0.3))

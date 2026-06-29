@@ -1,5 +1,7 @@
 use floem::{
-    AnyView, IntoView, easing,
+    AnyView, IntoView,
+    animate::Animation,
+    easing,
     icons::{self as icon_library, IconLibrary},
     prelude::*,
     theme::StyleThemeExt,
@@ -8,6 +10,25 @@ use floem::{
 use crate::form::{form, form_item};
 
 fn spinner(size: f64) -> AnyView {
+    let spin = RwSignal::new(
+        Animation::new()
+            .duration(1.seconds())
+            .keyframe(0, |f| f.style(|s| s.rotate(0.0.deg())).ease(easing::Linear))
+            .keyframe(25, |f| {
+                f.style(|s| s.rotate(90.0.deg())).ease(easing::Linear)
+            })
+            .keyframe(50, |f| {
+                f.style(|s| s.rotate(180.0.deg())).ease(easing::Linear)
+            })
+            .keyframe(75, |f| {
+                f.style(|s| s.rotate(270.0.deg())).ease(easing::Linear)
+            })
+            .keyframe(100, |f| {
+                f.style(|s| s.rotate(360.0.deg())).ease(easing::Linear)
+            })
+            .repeat(true),
+    );
+
     icon_library::icon(IconLibrary::Lucide, "loader-circle")
         .map(|icon| {
             icon.style(move |s| {
@@ -15,23 +36,7 @@ fn spinner(size: f64) -> AnyView {
                     .flex_shrink(0.0)
                     .with_theme(|s, t| s.color(t.foreground()))
             })
-            .animation(|a| {
-                a.duration(1.seconds())
-                    .keyframe(0, |f| f.style(|s| s.rotate(0.0.deg())).ease(easing::Linear))
-                    .keyframe(25, |f| {
-                        f.style(|s| s.rotate(90.0.deg())).ease(easing::Linear)
-                    })
-                    .keyframe(50, |f| {
-                        f.style(|s| s.rotate(180.0.deg())).ease(easing::Linear)
-                    })
-                    .keyframe(75, |f| {
-                        f.style(|s| s.rotate(270.0.deg())).ease(easing::Linear)
-                    })
-                    .keyframe(100, |f| {
-                        f.style(|s| s.rotate(360.0.deg())).ease(easing::Linear)
-                    })
-                    .repeat(true)
-            })
+            .animation(move |_| spin.get())
             .into_any()
         })
         .unwrap_or_else(|| Empty::new().style(move |s| s.size(size, size)).into_any())

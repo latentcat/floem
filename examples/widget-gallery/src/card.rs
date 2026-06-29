@@ -30,13 +30,10 @@ impl CardSize {
     }
 }
 
-fn card_style(size: CardSize) -> Style {
-    let spacing = size.spacing();
+fn card_style(_size: CardSize) -> Style {
     Style::new()
         .width(360.0)
         .flex_col()
-        .gap(spacing)
-        .padding_vert(spacing)
         .border(1.0)
         .border_radius(12.0)
         .corner_smoothing(0.6)
@@ -62,7 +59,7 @@ fn card_header(title: &'static str, description: &'static str, size: CardSize) -
                 .with_theme(|s, t| s.color(t.muted_foreground()))
         }),
     ))
-    .style(move |s| s.gap(4.0).padding_horiz(spacing))
+    .style(move |s| s.gap(4.0).padding_top(spacing).padding_horiz(spacing))
     .into_any()
 }
 
@@ -73,7 +70,7 @@ fn card_content(size: CardSize) -> AnyView {
         metric_row("Conversion", "8.2%"),
         metric_row("Active users", "2,413"),
     ))
-    .style(move |s| s.gap(8.0).padding_horiz(spacing))
+    .style(move |s| s.gap(8.0).padding_top(spacing).padding_horiz(spacing))
     .into_any()
 }
 
@@ -93,6 +90,7 @@ fn card_footer(size: CardSize) -> AnyView {
     .style(move |s| {
         s.items_center()
             .justify_between()
+            .margin_top(spacing)
             .padding(spacing)
             .border_top(1.0)
             .with_theme(|s, t| {

@@ -35,7 +35,7 @@ fn readonly_style() -> Style {
         .with_theme(|s, t| {
             s.background(t.def(|t| {
                 if t.is_dark {
-                    t.input().with_alpha(0.2)
+                    t.input_background()
                 } else {
                     t.muted().with_alpha(0.45)
                 }

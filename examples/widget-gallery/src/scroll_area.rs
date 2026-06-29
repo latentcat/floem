@@ -60,8 +60,7 @@ fn shadcn_scroll(content: impl IntoView + 'static, width: f64, height: f64) -> i
     content
         .scroll()
         .custom_style(|s| {
-            s.shrink_to_fit()
-                .track_background(Color::TRANSPARENT)
+            s.track_background(Color::TRANSPARENT)
                 .track_border_radius(0.0)
                 .track_rounded(false)
                 .handle_border_radius(100.pct())
@@ -172,11 +171,21 @@ fn section(title: &'static str, content: impl IntoView + 'static) -> AnyView {
 }
 
 pub fn scroll_area_view() -> impl IntoView {
-    let vertical_content =
-        Stack::vertical_from_iter((1..=18).map(row)).style(|s| s.flex_col().padding_horiz(14.0));
+    let vertical_content = Stack::vertical_from_iter((1..=18).map(row)).style(|s| {
+        s.width_full()
+            .min_height(520.0)
+            .flex_col()
+            .padding_horiz(14.0)
+    });
 
-    let horizontal_content = Stack::horizontal_from_iter((1..=12).map(token_tile))
-        .style(|s| s.items_center().gap(10.0).padding(14.0).min_width(1700.0));
+    let horizontal_content = Stack::horizontal_from_iter((1..=12).map(token_tile)).style(|s| {
+        s.min_width(1700.0)
+            .height_full()
+            .min_height(112.0)
+            .items_center()
+            .gap(10.0)
+            .padding(14.0)
+    });
 
     Stack::vertical((
         "Scroll Area".style(|s| {

@@ -3,10 +3,15 @@ use floem::{
     icons::{self as icon_library, IconLibrary},
     peniko::Color,
     prelude::*,
-    taffy::{FlexWrap, style::Display},
+    taffy::FlexWrap,
     text::FontWeight,
     theme::StyleThemeExt,
     views::{Button, Decorators},
+};
+
+use crate::{
+    portal::modal_portal,
+    shadcn_style::{text_column, wrap_text},
 };
 
 fn icon(name: &'static str, size: f64) -> AnyView {
@@ -48,15 +53,17 @@ fn header(title: &'static str, description: &'static str) -> AnyView {
             s.font_size(16.0)
                 .line_height(1.0)
                 .font_weight(FontWeight::MEDIUM)
+                .apply(wrap_text())
                 .with_theme(|s, t| s.color(t.popover_foreground()))
         }),
         description.style(|s| {
             s.font_size(14.0)
                 .line_height(1.4)
+                .apply(wrap_text())
                 .with_theme(|s, t| s.color(t.muted_foreground()))
         }),
     ))
-    .style(|s| s.flex_col().gap(8.0))
+    .style(|s| s.apply(text_column()).gap(8.0))
     .into_any()
 }
 
@@ -90,7 +97,7 @@ fn field(label: &'static str, value: &'static str) -> AnyView {
         }),
         TextInput::new(RwSignal::new(value.to_owned())).style(|s| s.flex_grow(1.0)),
     ))
-    .style(|s| s.items_center().gap(10.0))
+    .style(|s| s.items_center().gap(10.0).min_width(0.0))
     .into_any()
 }
 
@@ -112,7 +119,7 @@ fn dialog_surface(
                 Empty::new().style(|s| s.size(28.0, 28.0)).into_any()
             },
         ))
-        .style(|s| s.items_start().gap(12.0)),
+        .style(|s| s.items_start().gap(12.0).min_width(0.0)),
         body,
         footer(actions),
     ))
@@ -169,10 +176,11 @@ fn no_close_dialog() -> AnyView {
             icon("shield-alert", 18.0),
             "Your draft is saved locally.".style(|s| {
                 s.font_size(14.0)
+                    .apply(wrap_text())
                     .with_theme(|s, t| s.color(t.muted_foreground()))
             }),
         ))
-        .style(|s| s.items_center().gap(8.0)),
+        .style(|s| s.items_center().gap(8.0).min_width(0.0)),
         Stack::horizontal((Button::new("Sign in"),)),
         None,
         false,
@@ -182,22 +190,7 @@ fn no_close_dialog() -> AnyView {
 fn overlay_frame(open: RwSignal<bool>) -> AnyView {
     Stack::vertical((
         Button::new("Open dialog").action(move || open.set(true)),
-        Stack::vertical((profile_dialog(open)
-            .style(move |s| s.apply_if(!open.get(), |s| s.display(Display::None))),))
-        .style(move |s| {
-            s.width(560.0)
-                .height(360.0)
-                .items_center()
-                .justify_center()
-                .border(1.0)
-                .border_radius(8.0)
-                .corner_smoothing(0.6)
-                .background(Color::from_rgb8(0, 0, 0).with_alpha(0.10))
-                .apply_if(!open.get(), |s| {
-                    s.with_theme(|s, t| s.background(t.muted()))
-                })
-                .with_theme(|s, t| s.border_color(t.border()))
-        }),
+        modal_portal(open, move || profile_dialog(open)),
     ))
     .style(|s| s.flex_col().items_start().gap(12.0))
     .into_any()
@@ -217,7 +210,7 @@ fn section(title: &'static str, content: impl IntoView + 'static) -> AnyView {
 }
 
 pub fn dialog_view() -> impl IntoView {
-    let open = RwSignal::new(true);
+    let open = RwSignal::new(false);
 
     Stack::vertical((
         "Dialog".style(|s| {

@@ -10,6 +10,8 @@ use floem::{
     views::Decorators,
 };
 
+use crate::shadcn_style::{text_column, wrap_text};
+
 fn icon(name: &'static str, size: f64) -> AnyView {
     icon_library::icon(IconLibrary::Lucide, name)
         .map(|icon| {
@@ -79,17 +81,20 @@ fn nav_link(
                 s.font_size(14.0)
                     .font_weight(FontWeight::MEDIUM)
                     .line_height(1.3)
+                    .apply(wrap_text())
             }),
             description.style(|s| {
                 s.font_size(13.0)
                     .line_height(1.35)
+                    .apply(wrap_text())
                     .with_theme(|s, t| s.color(t.muted_foreground()))
             }),
         ))
-        .style(|s| s.flex_col().gap(2.0)),
+        .style(|s| s.apply(text_column()).gap(2.0)),
     ))
     .style(move |s| {
         s.width(236.0)
+            .min_width(0.0)
             .items_start()
             .gap(10.0)
             .padding(8.0)
@@ -120,11 +125,13 @@ fn feature_card() -> AnyView {
         "shadcn/ui".style(|s| {
             s.font_size(16.0)
                 .font_weight(FontWeight::SEMI_BOLD)
+                .apply(wrap_text())
                 .with_theme(|s, t| s.color(t.primary_foreground()))
         }),
         "Copy-paste components built with accessible primitives.".style(|s| {
             s.font_size(13.0)
                 .line_height(1.35)
+                .apply(wrap_text())
                 .with_theme(|s, t| s.color(t.primary_foreground()))
         }),
     ))

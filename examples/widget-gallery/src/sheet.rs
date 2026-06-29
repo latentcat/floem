@@ -3,11 +3,12 @@ use floem::{
     icons::{self as icon_library, IconLibrary},
     peniko::Color,
     prelude::*,
-    taffy::FlexWrap,
     text::FontWeight,
     theme::StyleThemeExt,
     views::{Button, Decorators},
 };
+
+use crate::shadcn_style::wrap_text;
 
 #[derive(Clone, Copy)]
 enum SheetSide {
@@ -74,6 +75,7 @@ fn sheet_header(side: SheetSide, show_close: bool) -> AnyView {
             side.title().style(|s| {
                 s.font_size(16.0)
                     .font_weight(FontWeight::MEDIUM)
+                    .apply(wrap_text())
                     .with_theme(|s, t| s.color(t.foreground()))
             }),
             Empty::new().style(|s| s.flex_grow(1.0)),
@@ -83,10 +85,11 @@ fn sheet_header(side: SheetSide, show_close: bool) -> AnyView {
                 Empty::new().style(|s| s.size(28.0, 28.0)).into_any()
             },
         ))
-        .style(|s| s.items_center().gap(8.0)),
+        .style(|s| s.items_center().gap(8.0).min_width(0.0)),
         "Make changes and save when you're done.".style(|s| {
             s.font_size(14.0)
                 .line_height(1.35)
+                .apply(wrap_text())
                 .with_theme(|s, t| s.color(t.muted_foreground()))
         }),
     ))
@@ -99,22 +102,25 @@ fn sheet_body() -> AnyView {
         Stack::horizontal((
             "Name".style(|s| {
                 s.width(72.0)
+                    .flex_shrink(0.0)
                     .font_size(14.0)
                     .with_theme(|s, t| s.color(t.foreground()))
             }),
-            TextInput::new(RwSignal::new("Jane Doe".to_string())).style(|s| s.flex_grow(1.0)),
+            TextInput::new(RwSignal::new("Jane Doe".to_string()))
+                .style(|s| s.flex_grow(1.0).min_width(0.0)),
         ))
-        .style(|s| s.items_center().gap(10.0)),
+        .style(|s| s.items_center().gap(10.0).min_width(0.0)),
         Stack::horizontal((
             "Email".style(|s| {
                 s.width(72.0)
+                    .flex_shrink(0.0)
                     .font_size(14.0)
                     .with_theme(|s, t| s.color(t.foreground()))
             }),
             TextInput::new(RwSignal::new("jane@example.com".to_string()))
-                .style(|s| s.flex_grow(1.0)),
+                .style(|s| s.flex_grow(1.0).min_width(0.0)),
         ))
-        .style(|s| s.items_center().gap(10.0)),
+        .style(|s| s.items_center().gap(10.0).min_width(0.0)),
     ))
     .style(|s| s.flex_col().gap(10.0).padding_horiz(16.0))
     .into_any()
@@ -135,10 +141,10 @@ fn panel(side: SheetSide, show_close: bool) -> AnyView {
     ))
     .style(move |s| {
         let s = match side {
-            SheetSide::Right => s.width(150.0).height_full().border_left(1.0),
-            SheetSide::Left => s.width(150.0).height_full().border_right(1.0),
-            SheetSide::Top => s.width_full().height(140.0).border_bottom(1.0),
-            SheetSide::Bottom => s.width_full().height(140.0).border_top(1.0),
+            SheetSide::Right => s.width(320.0).height_full().border_left(1.0),
+            SheetSide::Left => s.width(320.0).height_full().border_right(1.0),
+            SheetSide::Top => s.width_full().height(220.0).border_bottom(1.0),
+            SheetSide::Bottom => s.width_full().height(220.0).border_top(1.0),
         };
         s.flex_col()
             .box_shadow_blur(14.0)
@@ -206,8 +212,8 @@ fn preview(side: SheetSide, show_close: bool) -> AnyView {
         ))
         .style(|s| s.items_center()),
         content.clip().style(|s| {
-            s.width(320.0)
-                .height(220.0)
+            s.width(560.0)
+                .height(340.0)
                 .border(1.0)
                 .border_radius(8.0)
                 .corner_smoothing(0.6)
@@ -241,13 +247,13 @@ pub fn sheet_view() -> impl IntoView {
         }),
         Stack::horizontal((Button::new("Open sheet"), outline_button("Close sheet")))
             .style(|s| s.items_center().gap(8.0)),
-        Stack::horizontal((
+        Stack::vertical((
             section("Right", preview(SheetSide::Right, true)),
             section("Left", preview(SheetSide::Left, true)),
             section("Top", preview(SheetSide::Top, true)),
             section("Bottom", preview(SheetSide::Bottom, false)),
         ))
-        .style(|s| s.items_start().gap(24.0).flex_wrap(FlexWrap::Wrap)),
+        .style(|s| s.items_start().gap(24.0)),
     ))
     .style(|s| {
         s.flex_col()

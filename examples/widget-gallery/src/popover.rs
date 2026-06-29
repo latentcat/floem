@@ -3,11 +3,13 @@ use floem::{
     icons::{self as icon_library, IconLibrary},
     peniko::Color,
     prelude::*,
-    taffy::{FlexWrap, style::Display},
+    taffy::FlexWrap,
     text::FontWeight,
     theme::StyleThemeExt,
     views::{Button, Decorators},
 };
+
+use crate::portal::{PortalPosition, anchored_portal};
 
 fn icon(name: &'static str, size: f64) -> AnyView {
     icon_library::icon(IconLibrary::Lucide, name)
@@ -157,7 +159,7 @@ fn section(title: &'static str, content: impl IntoView + 'static) -> AnyView {
 }
 
 pub fn popover_view() -> impl IntoView {
-    let open = RwSignal::new(true);
+    let open = RwSignal::new(false);
 
     Stack::vertical((
         "Popover".style(|s| {
@@ -167,18 +169,16 @@ pub fn popover_view() -> impl IntoView {
         }),
         section(
             "Controlled",
-            Stack::vertical((
+            anchored_portal(
                 Button::new(
                     Stack::horizontal((icon("panel-top-open", 16.0), "Open popover"))
                         .style(|s| s.items_center().gap(6.0)),
                 )
                 .action(move || open.update(|value| *value = !*value)),
-                dimensions_surface().style(move |s| {
-                    s.margin_top(8.0)
-                        .apply_if(!open.get(), |s| s.display(Display::None))
-                }),
-            ))
-            .style(|s| s.flex_col().items_start()),
+                open,
+                PortalPosition::bottom_start(8.0),
+                dimensions_surface,
+            ),
         ),
         section(
             "Content",

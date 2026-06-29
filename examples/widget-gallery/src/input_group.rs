@@ -37,15 +37,9 @@ fn input_group(children: impl floem::view::IntoViewIter + 'static) -> AnyView {
                 .border_radius(8.0)
                 .corner_smoothing(0.6)
                 .with_theme(|s, t| {
-                    s.background(t.def(|t| {
-                        if t.is_dark {
-                            t.input().with_alpha(0.30)
-                        } else {
-                            t.background
-                        }
-                    }))
-                    .border_color(t.input())
-                    .color(t.foreground())
+                    s.background(t.input_background())
+                        .border_color(t.input())
+                        .color(t.foreground())
                 })
                 .focus_visible(|s| {
                     s.with_theme(|s, t| {

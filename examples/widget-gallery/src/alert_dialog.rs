@@ -3,13 +3,16 @@ use floem::{
     icons::{self as icon_library, IconLibrary},
     peniko::Color,
     prelude::*,
-    taffy::{FlexWrap, style::Display},
+    taffy::FlexWrap,
     text::FontWeight,
     theme::StyleThemeExt,
     views::{Button, Decorators},
 };
 
-use crate::shadcn_style::{fixed_square, wrap_text};
+use crate::{
+    portal::modal_portal,
+    shadcn_style::{fixed_square, wrap_text},
+};
 
 #[derive(Clone, Copy)]
 enum AlertSize {
@@ -194,22 +197,7 @@ fn plain_alert() -> AnyView {
 fn overlay_frame(open: RwSignal<bool>) -> AnyView {
     Stack::vertical((
         Button::new("Open alert dialog").action(move || open.set(true)),
-        Stack::vertical((delete_alert(open)
-            .style(move |s| s.apply_if(!open.get(), |s| s.display(Display::None))),))
-        .style(move |s| {
-            s.width(560.0)
-                .height(340.0)
-                .items_center()
-                .justify_center()
-                .border(1.0)
-                .border_radius(8.0)
-                .corner_smoothing(0.6)
-                .background(Color::from_rgb8(0, 0, 0).with_alpha(0.10))
-                .apply_if(!open.get(), |s| {
-                    s.with_theme(|s, t| s.background(t.muted()))
-                })
-                .with_theme(|s, t| s.border_color(t.border()))
-        }),
+        modal_portal(open, move || delete_alert(open)),
     ))
     .style(|s| s.flex_col().items_start().gap(12.0))
     .into_any()
@@ -229,7 +217,7 @@ fn section(title: &'static str, content: impl IntoView + 'static) -> AnyView {
 }
 
 pub fn alert_dialog_view() -> impl IntoView {
-    let open = RwSignal::new(true);
+    let open = RwSignal::new(false);
 
     Stack::vertical((
         "Alert Dialog".style(|s| {

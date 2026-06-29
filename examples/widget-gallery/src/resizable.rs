@@ -8,15 +8,19 @@ use floem::{
     views::{Decorators, resizable::Resizable},
 };
 
+use crate::shadcn_style::wrap_text;
+
 fn panel(title: &'static str, detail: &'static str) -> AnyView {
     Stack::vertical((
         title.style(|s| {
             s.font_size(14.0)
                 .font_weight(FontWeight::MEDIUM)
+                .apply(wrap_text())
                 .with_theme(|s, t| s.color(t.foreground()))
         }),
         detail.style(|s| {
             s.font_size(13.0)
+                .apply(wrap_text())
                 .with_theme(|s, t| s.color(t.muted_foreground()))
         }),
     ))
@@ -27,6 +31,7 @@ fn panel(title: &'static str, detail: &'static str) -> AnyView {
             .justify_center()
             .height_full()
             .min_size(0.0, 0.0)
+            .padding(12.0)
             .with_theme(|s, t| s.background(t.muted()).color(t.foreground()))
     })
     .into_any()
@@ -74,8 +79,9 @@ pub fn resizable_view() -> impl IntoView {
     .custom_sizes_pct(|| vec![(0, Pct(24.0)), (1, Pct(52.0))])
     .clip()
     .style(|s| {
-        s.width(660.0)
-            .height(220.0)
+        s.width(720.0)
+            .max_width_full()
+            .height(260.0)
             .border(1.0)
             .border_radius(12.0)
             .corner_smoothing(0.6)
@@ -86,8 +92,9 @@ pub fn resizable_view() -> impl IntoView {
         .custom_sizes_pct(|| vec![(0, Pct(32.0))])
         .clip()
         .style(|s| {
-            s.width(420.0)
-                .height(260.0)
+            s.width(720.0)
+                .max_width_full()
+                .height(280.0)
                 .flex_direction(FlexDirection::Column)
                 .border(1.0)
                 .border_radius(12.0)
@@ -101,31 +108,26 @@ pub fn resizable_view() -> impl IntoView {
                 .font_weight(FontWeight::SEMI_BOLD)
                 .with_theme(|s, t| s.color(t.foreground()))
         }),
-        section("Panel group", horizontal),
-        Stack::horizontal((
-            section("Vertical", vertical),
-            section(
-                "Handle styles",
-                Stack::vertical((handle_preview(true), handle_preview(false))).style(|s| {
-                    s.flex_col()
-                        .gap(18.0)
-                        .padding(18.0)
-                        .border(1.0)
-                        .border_radius(12.0)
-                        .corner_smoothing(0.6)
-                        .with_theme(|s, t| {
-                            s.background(t.card())
-                                .border_color(t.border())
-                                .color(t.card_foreground())
-                        })
-                }),
-            ),
-        ))
-        .style(|s| {
-            s.items_start()
-                .gap(24.0)
-                .flex_wrap(floem::taffy::FlexWrap::Wrap)
-        }),
+        section("Horizontal", horizontal),
+        section("Vertical", vertical),
+        section(
+            "Handle styles",
+            Stack::vertical((handle_preview(true), handle_preview(false))).style(|s| {
+                s.width(720.0)
+                    .max_width_full()
+                    .flex_col()
+                    .gap(18.0)
+                    .padding(18.0)
+                    .border(1.0)
+                    .border_radius(12.0)
+                    .corner_smoothing(0.6)
+                    .with_theme(|s, t| {
+                        s.background(t.card())
+                            .border_color(t.border())
+                            .color(t.card_foreground())
+                    })
+            }),
+        ),
     ))
     .style(|s| {
         s.flex_col()

@@ -42,8 +42,8 @@ fn command_input(value: &'static str, disabled: bool) -> AnyView {
             .border_radius(8.0)
             .corner_smoothing(0.6)
             .with_theme(|s, t| {
-                s.background(t.def(|t| t.input().with_alpha(0.3)))
-                    .border_color(t.def(|t| t.input().with_alpha(0.3)))
+                s.background(t.input_background())
+                    .border_color(t.input())
                     .disabled(|s| s.set(Opacity, 0.5).unset_cursor())
             })
             .apply_if(disabled, |s| s.set_disabled(true))

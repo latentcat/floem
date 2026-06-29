@@ -29,10 +29,14 @@ pub fn img_view() -> impl IntoView {
         ),
         form_item("Image Fit", object_fit_position_picker(ferris_png)),
         form_item("SVG(from string):", svg(svg_str).style(|s| s.width(100))),
-        form_item("JPG:", img(move || sunflower.to_vec())),
+        form_item("JPG(async):", img_async(move || sunflower.to_vec())),
         form_item(
-            "JPG(resized):",
-            img(move || sunflower.to_vec()).style(|s| s.width(320.pt()).height(490.pt())),
+            "JPG(async + decoded max size):",
+            img_async_with_options(
+                move || sunflower.to_vec(),
+                ImageDecodeOptions::default().with_max_size(320, 490),
+            )
+            .style(|s| s.width(320.pt()).height(490.pt())),
         ),
     ))
 }
@@ -128,7 +132,11 @@ fn object_fit_position_picker(image: &'static [u8]) -> impl IntoView {
     ))
     .style(|s| s.gap(10).items_start());
 
-    let preview = img(move || image.to_vec()).style(move |s| {
+    let preview = img_async_with_options(
+        move || image.to_vec(),
+        ImageDecodeOptions::default().with_max_size(300, 300),
+    )
+    .style(move |s| {
         s.object_fit(object_fit.get())
             .object_position(object_position.get())
             .size(300, 300)

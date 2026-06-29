@@ -1,16 +1,94 @@
 //! Module defining image view and its properties: style, position and fit.
 #![deny(missing_docs)]
-use std::{cell::RefCell, path::PathBuf, rc::Rc, sync::Arc};
+use std::{
+    cell::RefCell,
+    path::PathBuf,
+    rc::Rc,
+    sync::{Arc, Mutex, OnceLock, mpsc},
+    thread,
+};
 
-use floem_reactive::UpdaterEffect;
+use floem_reactive::{Effect, UpdaterEffect};
 use peniko::{Blob, ImageAlphaType, ImageData, kurbo::Rect};
 use sha2::{Digest, Sha256};
 
 use crate::{
-    Renderer, prop_extractor,
+    Renderer,
+    ext_event::{ExtSendTrigger, register_ext_trigger},
+    prop_extractor,
     style::{FontSizeCx, ObjectFit, ObjectPosition},
     view::{LayoutNodeCx, MeasureFn, View, ViewId},
 };
+
+type ImageDecodeTask = Box<dyn FnOnce() + Send + 'static>;
+
+struct ImageDecodePool {
+    sender: mpsc::Sender<ImageDecodeTask>,
+}
+
+impl ImageDecodePool {
+    fn new() -> Self {
+        let (sender, receiver) = mpsc::channel::<ImageDecodeTask>();
+        let receiver = Arc::new(Mutex::new(receiver));
+        let worker_count = thread::available_parallelism()
+            .map(|count| count.get().saturating_sub(1).clamp(1, 4))
+            .unwrap_or(2);
+
+        for index in 0..worker_count {
+            let receiver = receiver.clone();
+            let _ = thread::Builder::new()
+                .name(format!("floem-image-decode-{index}"))
+                .spawn(move || {
+                    loop {
+                        let task = {
+                            let receiver = receiver.lock().expect("image decode queue poisoned");
+                            receiver.recv()
+                        };
+
+                        match task {
+                            Ok(task) => task(),
+                            Err(_) => break,
+                        }
+                    }
+                });
+        }
+
+        Self { sender }
+    }
+
+    fn spawn(&self, task: impl FnOnce() + Send + 'static) {
+        let _ = self.sender.send(Box::new(task));
+    }
+}
+
+fn image_decode_pool() -> &'static ImageDecodePool {
+    static IMAGE_DECODE_POOL: OnceLock<ImageDecodePool> = OnceLock::new();
+    IMAGE_DECODE_POOL.get_or_init(ImageDecodePool::new)
+}
+
+/// Options for asynchronous image decoding.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ImageDecodeOptions {
+    max_size: Option<(u32, u32)>,
+}
+
+impl ImageDecodeOptions {
+    /// Limit decoded image dimensions to fit within `width` and `height`.
+    ///
+    /// This preserves aspect ratio and never upscales. The resize runs on the
+    /// image decode worker so the UI thread does not pay the cost.
+    pub const fn with_max_size(mut self, width: u32, height: u32) -> Self {
+        self.max_size = Some((width, height));
+        self
+    }
+}
+
+struct DecodedImage {
+    width: u32,
+    height: u32,
+    data: Arc<Vec<u8>>,
+    hash: Vec<u8>,
+}
 
 /// Holds information about image dimensions for layout calculations.
 #[derive(Clone)]
@@ -100,6 +178,105 @@ prop_extractor! {
     }
 }
 
+fn decoded_image_from_dynamic(
+    image: image::DynamicImage,
+    options: ImageDecodeOptions,
+) -> DecodedImage {
+    let image = if let Some((max_width, max_height)) = options.max_size
+        && max_width > 0
+        && max_height > 0
+        && (image.width() > max_width || image.height() > max_height)
+    {
+        image.resize(max_width, max_height, image::imageops::FilterType::Triangle)
+    } else {
+        image
+    };
+
+    let width = image.width();
+    let height = image.height();
+    let data = image.into_rgba8().into_vec();
+    let mut hasher = Sha256::new();
+    hasher.update(&data);
+    let hash = hasher.finalize().to_vec();
+
+    DecodedImage {
+        width,
+        height,
+        data: Arc::new(data),
+        hash,
+    }
+}
+
+fn decode_image_from_memory(bytes: Vec<u8>, options: ImageDecodeOptions) -> Option<DecodedImage> {
+    image::load_from_memory(&bytes)
+        .ok()
+        .map(|image| decoded_image_from_dynamic(image, options))
+}
+
+fn decode_image_from_path(path: PathBuf, options: ImageDecodeOptions) -> Option<DecodedImage> {
+    image::open(path)
+        .ok()
+        .map(|image| decoded_image_from_dynamic(image, options))
+}
+
+fn image_brush_from_decoded(image: &DecodedImage) -> peniko::ImageBrush {
+    peniko::ImageBrush::new(ImageData {
+        data: Blob::new(image.data.clone()),
+        format: peniko::ImageFormat::Rgba8,
+        alpha_type: ImageAlphaType::Alpha,
+        width: image.width,
+        height: image.height,
+    })
+    .with_quality(peniko::ImageQuality::High)
+}
+
+fn empty_image_brush() -> (peniko::ImageBrush, Vec<u8>) {
+    let image = DecodedImage {
+        width: 0,
+        height: 0,
+        data: Arc::new(Vec::new()),
+        hash: Sha256::digest([]).to_vec(),
+    };
+    (image_brush_from_decoded(&image), image.hash)
+}
+
+fn img_from_decoded(image: Option<DecodedImage>) -> Img {
+    let (img, img_hash) = image.map_or_else(empty_image_brush, |image| {
+        let img = image_brush_from_decoded(&image);
+        (img, image.hash)
+    });
+    img_static(img, img_hash)
+}
+
+fn schedule_image_decode(
+    id: ViewId,
+    decode: impl FnOnce() -> Option<DecodedImage> + Send + 'static,
+) {
+    let trigger = ExtSendTrigger::new();
+    let result = Arc::new(Mutex::new(None::<Option<DecodedImage>>));
+    let effect_result = result.clone();
+
+    Effect::new(move |_| {
+        trigger.track();
+        let decoded = effect_result
+            .lock()
+            .expect("image decode result poisoned")
+            .take();
+
+        if let Some(decoded) = decoded.flatten()
+            && id.try_root().is_some()
+        {
+            id.update_state(decoded);
+        }
+    });
+
+    image_decode_pool().spawn(move || {
+        let decoded = decode();
+        *result.lock().expect("image decode result poisoned") = Some(decoded);
+        register_ext_trigger(trigger);
+    });
+}
+
 /// Holds the data needed for [img] view fn to display images.
 pub struct Img {
     id: ViewId,
@@ -155,20 +332,33 @@ pub struct Img {
 /// });
 /// ```
 pub fn img(image: impl Fn() -> Vec<u8> + 'static) -> Img {
-    let image = image::load_from_memory(&image()).ok();
-    let width = image.as_ref().map_or(0, |img| img.width());
-    let height = image.as_ref().map_or(0, |img| img.height());
-    let data = Arc::new(image.map_or(Default::default(), |img| img.into_rgba8().into_vec()));
-    let blob = Blob::new(data);
-    let image = peniko::ImageBrush::new(ImageData {
-        data: blob,
-        format: peniko::ImageFormat::Rgba8,
-        alpha_type: ImageAlphaType::Alpha,
-        width,
-        height,
-    })
-    .with_quality(peniko::ImageQuality::High);
-    img_dynamic(move || image.clone())
+    img_from_decoded(decode_image_from_memory(
+        image(),
+        ImageDecodeOptions::default(),
+    ))
+}
+
+/// A view that decodes an in-memory image on a shared background worker pool.
+///
+/// This keeps file/image decoding, RGBA conversion, optional resizing, and
+/// image hash calculation off the UI thread. The view initially has no
+/// intrinsic image size and updates when decoding completes.
+pub fn img_async(image: impl FnOnce() -> Vec<u8> + Send + 'static) -> Img {
+    img_async_with_options(image, ImageDecodeOptions::default())
+}
+
+/// A view that decodes an in-memory image on a shared background worker pool
+/// using the provided decode options.
+pub fn img_async_with_options(
+    image: impl FnOnce() -> Vec<u8> + Send + 'static,
+    options: ImageDecodeOptions,
+) -> Img {
+    let (placeholder, img_hash) = empty_image_brush();
+    let img = img_static(placeholder, img_hash);
+    let id = img.id;
+
+    schedule_image_decode(id, move || decode_image_from_memory(image(), options));
+    img
 }
 
 /// A view that can display an image and controls its position.
@@ -190,19 +380,53 @@ pub fn img(image: impl Fn() -> Vec<u8> + 'static) -> Img {
 /// The `img` function is not reactive, so to make it change on event, wrap it
 /// with [`dyn_view`](crate::views::dyn_view::dyn_view).
 pub fn img_from_path(image: impl Fn() -> PathBuf + 'static) -> Img {
-    let image = image::open(image()).ok();
-    let width = image.as_ref().map_or(0, |img| img.width());
-    let height = image.as_ref().map_or(0, |img| img.height());
-    let data = Arc::new(image.map_or(Default::default(), |img| img.into_rgba8().into_vec()));
-    let blob = Blob::new(data);
-    let image = peniko::ImageBrush::new(ImageData {
-        data: blob,
-        format: peniko::ImageFormat::Rgba8,
-        alpha_type: ImageAlphaType::Alpha,
-        width,
-        height,
-    });
-    img_dynamic(move || image.clone())
+    img_from_decoded(decode_image_from_path(
+        image(),
+        ImageDecodeOptions::default(),
+    ))
+}
+
+/// A view that decodes an image from a path on a shared background worker pool.
+///
+/// This is the preferred constructor for large local files because opening,
+/// decoding, RGBA conversion, optional resizing, and hash calculation do not
+/// block the UI thread.
+pub fn img_from_path_async(image: impl FnOnce() -> PathBuf + Send + 'static) -> Img {
+    img_from_path_async_with_options(image, ImageDecodeOptions::default())
+}
+
+/// A view that decodes an image from a path on a shared background worker pool
+/// using the provided decode options.
+pub fn img_from_path_async_with_options(
+    image: impl FnOnce() -> PathBuf + Send + 'static,
+    options: ImageDecodeOptions,
+) -> Img {
+    let (placeholder, img_hash) = empty_image_brush();
+    let img = img_static(placeholder, img_hash);
+    let id = img.id;
+
+    schedule_image_decode(id, move || decode_image_from_path(image(), options));
+    img
+}
+
+fn img_static(img: peniko::ImageBrush, img_hash: Vec<u8>) -> Img {
+    let id = ViewId::new();
+
+    let layout_data = Rc::new(RefCell::new(ImageLayoutData::new(
+        img.image.width,
+        img.image.height,
+    )));
+
+    let mut img = Img {
+        id,
+        img,
+        img_hash,
+        layout_data,
+        style: Extractor::default(),
+    };
+
+    img.set_taffy_layout();
+    img
 }
 
 pub(crate) fn img_dynamic(image: impl Fn() -> peniko::ImageBrush + 'static) -> Img {
@@ -324,6 +548,25 @@ impl Img {
     fn needs_clip(&self) -> bool {
         matches!(self.style.object_fit(), ObjectFit::Cover | ObjectFit::None)
     }
+
+    fn set_image(&mut self, img: peniko::ImageBrush, img_hash: Vec<u8>) {
+        let width = img.image.width;
+        let height = img.image.height;
+
+        self.img_hash = img_hash;
+        self.layout_data.borrow_mut().natural_width = width;
+        self.layout_data.borrow_mut().natural_height = height;
+        self.img = img;
+
+        self.id.request_mark_view_layout_dirty();
+        self.id.request_layout();
+        self.id.request_paint();
+    }
+
+    fn set_decoded_image(&mut self, image: DecodedImage) {
+        let img = image_brush_from_decoded(&image);
+        self.set_image(img, image.hash);
+    }
 }
 
 impl View for Img {
@@ -336,20 +579,15 @@ impl View for Img {
     }
 
     fn update(&mut self, _cx: &mut crate::context::UpdateCx, state: Box<dyn std::any::Any>) {
-        if let Ok(img) = state.downcast::<peniko::ImageBrush>() {
-            let mut hasher = Sha256::new();
-            hasher.update(img.image.data.data());
-            self.img_hash = hasher.finalize().to_vec();
-
-            // Update layout data with new image dimensions
-            let width = img.image.width;
-            let height = img.image.height;
-            self.layout_data.borrow_mut().natural_width = width;
-            self.layout_data.borrow_mut().natural_height = height;
-
-            self.img = *img;
-            self.id.request_mark_view_layout_dirty();
-            self.id.request_layout();
+        match state.downcast::<DecodedImage>() {
+            Ok(image) => self.set_decoded_image(*image),
+            Err(state) => {
+                if let Ok(img) = state.downcast::<peniko::ImageBrush>() {
+                    let mut hasher = Sha256::new();
+                    hasher.update(img.image.data.data());
+                    self.set_image(*img, hasher.finalize().to_vec());
+                }
+            }
         }
     }
 

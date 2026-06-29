@@ -6,7 +6,11 @@ use floem::{
 pub fn background_blur_view() -> impl IntoView {
     let sunflower = include_bytes!("./../assets/sunflower.jpg");
 
-    let background = img(move || sunflower.to_vec()).style(|s| {
+    let background = img_async_with_options(
+        move || sunflower.to_vec(),
+        ImageDecodeOptions::default().with_max_size(1280, 960),
+    )
+    .style(|s| {
         s.absolute()
             .inset(0)
             .size_full()

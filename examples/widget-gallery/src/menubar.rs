@@ -10,6 +10,8 @@ use floem::{
     views::Decorators,
 };
 
+use crate::portal::{PortalPosition, anchored_portal};
+
 #[derive(Clone, Copy)]
 enum MenuVariant {
     Default,
@@ -299,49 +301,108 @@ fn view_menu() -> AnyView {
     )
 }
 
-fn submenu_pair() -> AnyView {
-    Stack::horizontal((
-        file_menu(),
-        menu_surface(
-            Stack::vertical((
-                menu_item(
-                    None,
-                    "Email link",
-                    None,
-                    None,
-                    MenuVariant::Default,
-                    false,
-                    false,
-                    false,
-                ),
-                menu_item(
-                    None,
-                    "Copy link",
-                    None,
-                    None,
-                    MenuVariant::Default,
-                    false,
-                    false,
-                    false,
-                ),
-                separator(),
-                menu_item(
-                    None,
-                    "Invite team",
-                    None,
-                    None,
-                    MenuVariant::Default,
-                    true,
-                    false,
-                    false,
-                ),
-            )),
-            150.0,
-            true,
-        ),
-    ))
-    .style(|s| s.items_start().gap(8.0))
-    .into_any()
+fn menubar_portal_preview(
+    active: &'static str,
+    content: impl Fn() -> AnyView + 'static,
+) -> AnyView {
+    let open = RwSignal::new(false);
+    anchored_portal(
+        menubar_root(active).on_event_stop(listener::Click, move |_, _| {
+            open.update(|value| *value = !*value)
+        }),
+        open,
+        PortalPosition::bottom_start(6.0),
+        content,
+    )
+}
+
+fn menubar_submenu_content(sub_open: RwSignal<bool>) -> AnyView {
+    menu_surface(
+        Stack::vertical((
+            menu_item(
+                Some("file-plus"),
+                "New Tab",
+                Some("Cmd T"),
+                None,
+                MenuVariant::Default,
+                false,
+                false,
+                false,
+            ),
+            menu_item(
+                Some("copy-plus"),
+                "New Window",
+                Some("Cmd N"),
+                None,
+                MenuVariant::Default,
+                false,
+                false,
+                false,
+            ),
+            separator(),
+            anchored_portal(
+                sub_trigger("Share", sub_open.get(), false)
+                    .on_event_stop(listener::PointerEnter, move |_, _| sub_open.set(true))
+                    .on_event_stop(listener::Click, move |_, _| {
+                        sub_open.update(|value| *value = !*value)
+                    }),
+                sub_open,
+                PortalPosition::right_start(4.0),
+                || {
+                    menu_surface(
+                        Stack::vertical((
+                            menu_item(
+                                None,
+                                "Email link",
+                                None,
+                                None,
+                                MenuVariant::Default,
+                                false,
+                                false,
+                                false,
+                            ),
+                            menu_item(
+                                None,
+                                "Copy link",
+                                None,
+                                None,
+                                MenuVariant::Default,
+                                false,
+                                false,
+                                false,
+                            ),
+                            separator(),
+                            menu_item(
+                                None,
+                                "Invite team",
+                                None,
+                                None,
+                                MenuVariant::Default,
+                                true,
+                                false,
+                                false,
+                            ),
+                        )),
+                        150.0,
+                        true,
+                    )
+                },
+            ),
+            separator(),
+            menu_item(
+                Some("trash-2"),
+                "Close Workspace",
+                None,
+                None,
+                MenuVariant::Destructive,
+                false,
+                false,
+                false,
+            ),
+        )),
+        260.0,
+        false,
+    )
 }
 
 fn section(title: &'static str, content: impl IntoView + 'static) -> AnyView {
@@ -365,21 +426,15 @@ pub fn menubar_view() -> impl IntoView {
                 .with_theme(|s, t| s.color(t.foreground()))
         }),
         Stack::horizontal((
-            section(
-                "Root + Content",
-                Stack::vertical((menubar_root("File"), file_menu()))
-                    .style(|s| s.flex_col().items_start().gap(8.0)),
-            ),
+            section("Root + Content", menubar_portal_preview("File", file_menu)),
             section(
                 "Radio / Checkbox",
-                Stack::vertical((menubar_root("View"), view_menu()))
-                    .style(|s| s.flex_col().items_start().gap(8.0)),
+                menubar_portal_preview("View", view_menu),
             ),
-            section(
-                "Submenu",
-                Stack::vertical((menubar_root("File"), submenu_pair()))
-                    .style(|s| s.flex_col().items_start().gap(8.0)),
-            ),
+            section("Submenu", {
+                let sub_open = RwSignal::new(false);
+                menubar_portal_preview("File", move || menubar_submenu_content(sub_open))
+            }),
         ))
         .style(|s| s.items_start().gap(24.0).flex_wrap(FlexWrap::Wrap)),
     ))

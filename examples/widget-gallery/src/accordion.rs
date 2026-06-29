@@ -30,23 +30,32 @@ fn accordion_item(
     let is_open = move || open.get() == Some(index);
 
     Stack::vertical((
-        Button::new(Stack::horizontal((
-            title.style(|s| {
-                s.font_size(14.0)
-                    .font_weight(FontWeight::MEDIUM)
-                    .line_height(1.3)
-                    .flex_grow(1.0)
-                    .apply(wrap_text())
+        Button::new(
+            Stack::horizontal((
+                title.style(|s| {
+                    s.font_size(14.0)
+                        .font_weight(FontWeight::MEDIUM)
+                        .line_height(1.3)
+                        .flex_grow(1.0)
+                        .apply(wrap_text())
+                }),
+                dyn_view(move || {
+                    if is_open() {
+                        icon("chevron-up")
+                    } else {
+                        icon("chevron-down")
+                    }
+                })
+                .style(|s| s.with_theme(|s, t| s.color(t.muted_foreground()))),
+            ))
+            .style(|s| {
+                s.width_full()
+                    .min_width(0.0)
+                    .items_center()
+                    .justify_between()
+                    .gap(12.0)
             }),
-            dyn_view(move || {
-                if is_open() {
-                    icon("chevron-up")
-                } else {
-                    icon("chevron-down")
-                }
-            })
-            .style(|s| s.with_theme(|s, t| s.color(t.muted_foreground()))),
-        )))
+        )
         .action(move || {
             if !disabled {
                 open.update(|current| {
@@ -61,9 +70,7 @@ fn accordion_item(
         .style(move |s| {
             s.width_full()
                 .min_height(42.0)
-                .items_start()
-                .justify_between()
-                .gap(12.0)
+                .items_center()
                 .padding_horiz(0.0)
                 .padding_vert(10.0)
                 .border(1.0)

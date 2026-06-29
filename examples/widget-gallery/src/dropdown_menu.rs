@@ -10,6 +10,8 @@ use floem::{
     views::{Button, Decorators},
 };
 
+use crate::portal::{PortalPosition, anchored_portal};
+
 #[derive(Clone, Copy)]
 enum MenuVariant {
     Default,
@@ -253,60 +255,83 @@ fn choice_menu() -> AnyView {
     )
 }
 
-fn submenu_pair() -> AnyView {
-    Stack::horizontal((
-        menu_surface(
-            Stack::vertical((
-                menu_item(
-                    Some("plus"),
-                    "New task",
-                    Some("Cmd N"),
-                    None,
-                    MenuVariant::Default,
-                    false,
-                    false,
-                    false,
-                ),
-                sub_trigger("Move to", true, false),
-                sub_trigger("Assign to", false, false),
-                menu_separator(),
-                menu_item(
-                    None,
-                    "Archive",
-                    None,
-                    None,
-                    MenuVariant::Default,
-                    false,
-                    false,
-                    false,
-                ),
-            )),
-            176.0,
-        ),
-        menu_surface(
-            Stack::vertical((
-                radio_item("Backlog", false, false, false),
-                radio_item("Todo", true, false, false),
-                radio_item("In Progress", false, false, false),
-                radio_item("Done", false, true, false),
-            )),
-            160.0,
-        ),
-    ))
-    .style(|s| s.items_start().gap(8.0))
-    .into_any()
-}
-
 fn trigger_preview() -> AnyView {
-    Stack::vertical((
+    let open = RwSignal::new(false);
+    anchored_portal(
         Button::new(
             Stack::horizontal(("Open menu", icon("chevron-down", 16.0)))
                 .style(|s| s.items_center().gap(6.0)),
-        ),
-        account_menu().style(|s| s.margin_top(8.0)),
-    ))
-    .style(|s| s.flex_col().items_start())
-    .into_any()
+        )
+        .action(move || open.update(|value| *value = !*value)),
+        open,
+        PortalPosition::bottom_start(8.0),
+        account_menu,
+    )
+}
+
+fn submenu_portal_content(sub_open: RwSignal<bool>) -> AnyView {
+    menu_surface(
+        Stack::vertical((
+            menu_item(
+                Some("plus"),
+                "New task",
+                Some("Cmd N"),
+                None,
+                MenuVariant::Default,
+                false,
+                false,
+                false,
+            ),
+            anchored_portal(
+                sub_trigger("Move to", sub_open.get(), false)
+                    .on_event_stop(listener::PointerEnter, move |_, _| sub_open.set(true))
+                    .on_event_stop(listener::Click, move |_, _| {
+                        sub_open.update(|value| *value = !*value)
+                    }),
+                sub_open,
+                PortalPosition::right_start(4.0),
+                move || {
+                    menu_surface(
+                        Stack::vertical((
+                            radio_item("Backlog", false, false, false),
+                            radio_item("Todo", true, false, false),
+                            radio_item("In Progress", false, false, false),
+                            radio_item("Done", false, true, false),
+                        )),
+                        160.0,
+                    )
+                },
+            ),
+            sub_trigger("Assign to", false, false),
+            menu_separator(),
+            menu_item(
+                None,
+                "Archive",
+                None,
+                None,
+                MenuVariant::Default,
+                false,
+                false,
+                false,
+            ),
+        )),
+        176.0,
+    )
+}
+
+fn submenu_portal_preview() -> AnyView {
+    let open = RwSignal::new(false);
+    let sub_open = RwSignal::new(false);
+    anchored_portal(
+        Button::new(
+            Stack::horizontal(("Open submenu", icon("chevron-down", 16.0)))
+                .style(|s| s.items_center().gap(6.0)),
+        )
+        .action(move || open.update(|value| *value = !*value)),
+        open,
+        PortalPosition::bottom_start(8.0),
+        move || submenu_portal_content(sub_open),
+    )
 }
 
 fn section(title: &'static str, content: impl IntoView + 'static) -> AnyView {
@@ -332,7 +357,7 @@ pub fn dropdown_menu_view() -> impl IntoView {
         Stack::horizontal((
             section("Trigger + Content", trigger_preview()),
             section("Checkbox / Radio", choice_menu()),
-            section("Submenu", submenu_pair()),
+            section("Submenu", submenu_portal_preview()),
         ))
         .style(|s| s.items_start().gap(24.0).flex_wrap(FlexWrap::Wrap)),
     ))

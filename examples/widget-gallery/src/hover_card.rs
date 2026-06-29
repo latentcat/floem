@@ -148,18 +148,35 @@ fn file_card() -> AnyView {
 }
 
 fn team_card() -> AnyView {
+    let avatar_group_width = 36.0 + (36.0 - 10.0) * 2.0;
+    let avatars = Stack::horizontal((
+        avatar("DS", 36.0),
+        avatar("FE", 36.0).style(|s| s.margin_left(-10.0)),
+        avatar("QA", 36.0).style(|s| s.margin_left(-10.0)),
+    ))
+    .style(move |s| {
+        s.width(avatar_group_width)
+            .min_width(avatar_group_width)
+            .max_width(avatar_group_width)
+            .items_center()
+            .flex_shrink(0.0)
+    });
+
     hover_card_surface(Stack::vertical((
         Stack::horizontal((
-            avatar("DS", 36.0),
-            avatar("FE", 36.0).style(|s| s.margin_left(-10.0)),
-            avatar("QA", 36.0).style(|s| s.margin_left(-10.0)),
+            avatars,
             Stack::vertical((
                 title("Design System"),
                 description("3 maintainers active this week."),
             ))
-            .style(|s| s.apply(text_column()).gap(3.0).margin_left(2.0)),
+            .style(|s| {
+                s.apply(text_column())
+                    .gap(3.0)
+                    .flex_grow(1.0)
+                    .min_width(0.0)
+            }),
         ))
-        .style(|s| s.items_center()),
+        .style(|s| s.items_center().gap(10.0).min_width(0.0)),
         meta_row("message-circle", "18 component updates reviewed"),
     )))
 }

@@ -19,12 +19,12 @@ fn textarea_surface(placeholder: &'static str, invalid: bool, disabled: bool) ->
                 .corner_smoothing(0.6)
                 .font_size(14.0)
                 .set_disabled(disabled)
-                .with_theme(|s, t| {
-                    s.background(t.def(|t| {
-                        if t.is_dark {
-                            t.input().with_alpha(0.30)
+                .with_theme(move |s, t| {
+                    s.background(t.def(move |t| {
+                        if disabled {
+                            t.input_disabled_background()
                         } else {
-                            t.background
+                            t.input_background()
                         }
                     }))
                     .border_color(t.input())

@@ -60,25 +60,10 @@ fn variant_style(variant: ButtonVariant) -> Style {
                 .hover(|s| s.background(t.button_secondary_hover()))
         }),
         ButtonVariant::Outline => Style::new().with_theme(|s, t| {
-            s.background(t.def(|t| {
-                if t.is_dark {
-                    t.input().with_alpha(0.3)
-                } else {
-                    t.background
-                }
-            }))
-            .border_color(t.def(|t| if t.is_dark { t.input() } else { t.border() }))
-            .color(t.foreground())
-            .hover(|s| {
-                s.background(t.def(|t| {
-                    if t.is_dark {
-                        t.input().with_alpha(0.5)
-                    } else {
-                        t.muted()
-                    }
-                }))
+            s.background(t.input_background())
+                .border_color(t.input())
                 .color(t.foreground())
-            })
+                .hover(|s| s.background(t.muted()).color(t.foreground()))
         }),
         ButtonVariant::Ghost => Style::new()
             .background(Color::TRANSPARENT)

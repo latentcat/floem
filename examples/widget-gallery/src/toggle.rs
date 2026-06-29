@@ -95,13 +95,7 @@ fn toggle_style(variant: ToggleVariant, size: ToggleSize, pressed: bool) -> Styl
         ToggleVariant::Default => style,
         ToggleVariant::Outline => style.with_theme(|s, t| {
             s.border_color(t.input())
-                .background(t.def(|t| {
-                    if t.is_dark {
-                        t.input().with_alpha(0.30)
-                    } else {
-                        Color::TRANSPARENT
-                    }
-                }))
+                .background(t.input_background())
                 .hover(|s| s.background(t.muted()))
         }),
     }

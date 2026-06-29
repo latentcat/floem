@@ -3,11 +3,12 @@ use floem::{
     icons::{self as icon_library, IconLibrary},
     peniko::Color,
     prelude::*,
-    taffy::FlexWrap,
     text::FontWeight,
     theme::StyleThemeExt,
     views::{Button, Decorators},
 };
+
+use crate::shadcn_style::wrap_text;
 
 #[derive(Clone, Copy)]
 enum DrawerSide {
@@ -74,12 +75,14 @@ fn header(side: DrawerSide) -> AnyView {
         side.title().style(|s| {
             s.font_size(16.0)
                 .font_weight(FontWeight::MEDIUM)
+                .apply(wrap_text())
                 .with_theme(|s, t| s.color(t.foreground()))
         }),
         "Drawer content uses the popover surface with directional borders and rounded corners."
             .style(|s| {
                 s.font_size(14.0)
                     .line_height(1.35)
+                    .apply(wrap_text())
                     .with_theme(|s, t| s.color(t.muted_foreground()))
             }),
     ))
@@ -98,16 +101,22 @@ fn body() -> AnyView {
     Stack::vertical((
         Stack::horizontal((
             icon("calendar-days", 16.0),
-            "Schedule maintenance window"
-                .style(|s| s.font_size(14.0).with_theme(|s, t| s.color(t.foreground()))),
+            "Schedule maintenance window".style(|s| {
+                s.font_size(14.0)
+                    .apply(wrap_text())
+                    .with_theme(|s, t| s.color(t.foreground()))
+            }),
         ))
-        .style(|s| s.items_center().gap(8.0)),
+        .style(|s| s.items_center().gap(8.0).min_width(0.0)),
         Stack::horizontal((
             icon("bell", 16.0),
-            "Notify all project members"
-                .style(|s| s.font_size(14.0).with_theme(|s, t| s.color(t.foreground()))),
+            "Notify all project members".style(|s| {
+                s.font_size(14.0)
+                    .apply(wrap_text())
+                    .with_theme(|s, t| s.color(t.foreground()))
+            }),
         ))
-        .style(|s| s.items_center().gap(8.0)),
+        .style(|s| s.items_center().gap(8.0).min_width(0.0)),
     ))
     .style(|s| s.flex_col().gap(10.0).padding_horiz(16.0))
     .into_any()
@@ -144,10 +153,10 @@ fn content(side: DrawerSide) -> AnyView {
     inner
         .style(move |s| {
             let s = match side {
-                DrawerSide::Bottom => s.width_full().height(180.0).border_top(1.0),
-                DrawerSide::Top => s.width_full().height(170.0).border_bottom(1.0),
-                DrawerSide::Left => s.width(190.0).height_full().border_right(1.0),
-                DrawerSide::Right => s.width(190.0).height_full().border_left(1.0),
+                DrawerSide::Bottom => s.width_full().height(230.0).border_top(1.0),
+                DrawerSide::Top => s.width_full().height(220.0).border_bottom(1.0),
+                DrawerSide::Left => s.width(280.0).height_full().border_right(1.0),
+                DrawerSide::Right => s.width(280.0).height_full().border_left(1.0),
             };
             s.with_theme(|s, t| {
                 s.background(t.popover())
@@ -209,8 +218,8 @@ fn preview(side: DrawerSide) -> AnyView {
                 .with_theme(|s, t| s.color(t.foreground()))
         }),
         content.clip().style(|s| {
-            s.width(320.0)
-                .height(240.0)
+            s.width(560.0)
+                .height(340.0)
                 .border(1.0)
                 .border_radius(8.0)
                 .corner_smoothing(0.6)
@@ -231,13 +240,13 @@ pub fn drawer_view() -> impl IntoView {
         }),
         Stack::horizontal((Button::new("Open drawer"), outline_button("Close drawer")))
             .style(|s| s.items_center().gap(8.0)),
-        Stack::horizontal((
+        Stack::vertical((
             preview(DrawerSide::Bottom),
             preview(DrawerSide::Top),
             preview(DrawerSide::Left),
             preview(DrawerSide::Right),
         ))
-        .style(|s| s.items_start().gap(24.0).flex_wrap(FlexWrap::Wrap)),
+        .style(|s| s.items_start().gap(24.0)),
     ))
     .style(|s| {
         s.flex_col()

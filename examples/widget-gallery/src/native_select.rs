@@ -1,9 +1,9 @@
 use floem::{
     AnyView, IntoView,
     icons::{self as icon_library, IconLibrary},
+    menu::Menu,
     prelude::*,
     theme::StyleThemeExt,
-    views::dropdown::Dropdown,
 };
 
 use crate::form::{form, form_item};
@@ -27,58 +27,71 @@ impl std::fmt::Display for SelectValue {
     }
 }
 
+impl SelectValue {
+    fn all() -> [Self; 4] {
+        [Self::Apple, Self::Banana, Self::Blueberry, Self::Grapes]
+    }
+}
+
 fn chevron() -> AnyView {
     icon_library::icon(IconLibrary::Lucide, "chevron-down")
-        .map(|icon| icon.style(|s| s.size(16.0, 16.0)).into_any())
+        .map(|icon| {
+            icon.style(|s| s.size(16.0, 16.0).flex_shrink(0.0))
+                .into_any()
+        })
         .unwrap_or_else(|| Empty::new().style(|s| s.size(16.0, 16.0)).into_any())
+}
+
+fn native_select_menu(active: RwSignal<SelectValue>) -> Menu {
+    SelectValue::all()
+        .into_iter()
+        .fold(Menu::new(), move |menu, value| {
+            menu.item(value.to_string(), move |item| {
+                item.checked(active.get_untracked() == value)
+                    .action(move || active.set(value))
+            })
+        })
 }
 
 fn native_select(size: &'static str, height: f64) -> AnyView {
     let active = RwSignal::new(SelectValue::Apple);
-    Dropdown::new_rw(
-        active,
-        [
-            SelectValue::Apple,
-            SelectValue::Banana,
-            SelectValue::Blueberry,
-            SelectValue::Grapes,
-        ],
-    )
-    .main_view(move |value: SelectValue| {
-        Stack::horizontal((value.to_string(), chevron()))
-            .style(move |s| {
-                s.width(220.0)
-                    .height(height)
-                    .items_center()
-                    .justify_between()
-                    .padding_left(10.0)
-                    .padding_right(8.0)
-                    .border(1.0)
-                    .border_radius(if size == "sm" { 7.0 } else { 8.0 })
-                    .corner_smoothing(0.6)
-                    .font_size(14.0)
-                    .with_theme(|s, t| {
-                        s.background(t.def(|t| {
-                            if t.is_dark {
-                                t.input().with_alpha(0.30)
-                            } else {
-                                t.background
-                            }
-                        }))
-                        .border_color(t.input())
-                        .color(t.foreground())
-                    })
+    Stack::horizontal((
+        dyn_view(move || {
+            active
+                .get()
+                .to_string()
+                .style(|s| s.font_size(14.0))
+                .into_any()
+        }),
+        Empty::new().style(|s| s.flex_grow(1.0)),
+        chevron(),
+    ))
+    .popout_menu(move || native_select_menu(active))
+    .style(move |s| {
+        s.width(220.0)
+            .height(height)
+            .items_center()
+            .gap(8.0)
+            .padding_left(10.0)
+            .padding_right(8.0)
+            .border(1.0)
+            .border_radius(if size == "sm" { 7.0 } else { 8.0 })
+            .corner_smoothing(0.6)
+            .font_size(14.0)
+            .selectable(false)
+            .cursor(floem::style::CursorStyle::Pointer)
+            .with_theme(|s, t| {
+                s.background(t.input_background())
+                    .border_color(t.input())
+                    .color(t.foreground())
+                    .hover(|s| s.background(t.input_background()))
                     .focus_visible(|s| {
-                        s.with_theme(|s, t| {
-                            s.border_color(t.ring())
-                                .outline(3.0)
-                                .outline_color(t.ring_focus())
-                        })
+                        s.border_color(t.ring())
+                            .outline(3.0)
+                            .outline_color(t.ring_focus())
                     })
             })
-            .into_any()
     })
-    .style(|s| s.width(220.0))
     .into_any()
 }
 
