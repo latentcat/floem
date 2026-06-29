@@ -7,6 +7,11 @@ edition = "2024"
 floem = { path = "../.." }
 strum = { workspace = true }
 files = { path = "../files/", optional = true }
+bytemuck = { version = "1", features = ["derive"] }
+wgpu = { workspace = true }
+bevy = { version = "0.18.1", default-features = false, features = [
+  "std",
+], optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 signpost = "*"
@@ -15,3 +20,4 @@ signpost = "*"
 default = ["full"]
 vello = ["floem/vello"]
 full = ["dep:files"]
+bevy-render-test = ["dep:bevy"]

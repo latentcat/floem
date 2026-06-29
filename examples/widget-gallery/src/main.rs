@@ -1,5 +1,6 @@
 pub mod animation;
 pub mod background_blur;
+pub mod bevy_render_test;
 pub mod buttons;
 pub mod canvas;
 pub mod checkbox;
@@ -15,10 +16,12 @@ pub mod inputs;
 pub mod labels;
 pub mod lists;
 pub mod radio_buttons;
+pub mod render_test_common;
 pub mod rich_text;
 pub mod slider;
 pub mod tabs;
 pub mod texteditor;
+pub mod wgpu_render_test;
 
 use floem::{
     action::{set_theme, set_window_menu, toggle_global_theme, toggle_window_theme},
@@ -49,6 +52,8 @@ fn app_view(window_id: WindowId) -> impl IntoView {
         "Image",
         "Background Blur",
         "Corner Smoothing",
+        "WGPU Render Test",
+        "Bevy Render Test",
         "Dropdown",
         "Checkbox",
         "Radio",
@@ -79,6 +84,8 @@ fn app_view(window_id: WindowId) -> impl IntoView {
             "Image" => images::img_view().into_any(),
             "Background Blur" => background_blur::background_blur_view().into_any(),
             "Corner Smoothing" => corner_smoothing::corner_smoothing_view().into_any(),
+            "WGPU Render Test" => wgpu_render_test::wgpu_render_test_view().into_any(),
+            "Bevy Render Test" => bevy_render_test::bevy_render_test_view().into_any(),
             "Clipboard" => clipboard::clipboard_view().into_any(),
             "Slider" => slider::slider_view().into_any(),
             "Dropdown" => dropdown::dropdown_view().into_any(),

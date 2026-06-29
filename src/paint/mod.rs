@@ -26,10 +26,14 @@ use crossbeam::channel::Receiver;
 use std::sync::mpsc::Receiver;
 
 use crate::ElementId;
+use crate::action::{Timer, TimerToken};
+use crate::app::{AppUpdateEvent, add_app_update_event};
+use crate::platform::Instant;
 use crate::style::FontSizeCx;
 use crate::view::ViewId;
 use crate::view::stacking::{StackingContextItem, collect_stacking_context_items_into};
 use crate::view::{paint_bg, paint_border, paint_outline};
+use crate::window::handle::{get_current_view, set_current_view};
 use crate::window::state::WindowState;
 
 std::thread_local! {
@@ -405,6 +409,50 @@ impl PaintCx<'_> {
                 radius,
                 corner_radius,
             });
+    }
+
+    pub fn draw_wgpu_scene(
+        &mut self,
+        rect: peniko::kurbo::Rect,
+        callback: Box<floem_renderer::WgpuSceneCallback>,
+    ) {
+        self.paint_state
+            .renderer_mut()
+            .draw_wgpu_scene(floem_renderer::WgpuSceneCommand { rect, callback });
+    }
+
+    /// Execute a callback on the next animation frame for the window currently being painted.
+    ///
+    /// This is useful for paint-driven animations that should stop naturally when the
+    /// view is no longer painted.
+    pub fn request_animation_frame(
+        &mut self,
+        action: impl FnOnce(TimerToken) + 'static,
+    ) -> TimerToken {
+        let view = self.target_id.owning_id();
+        let Some(window_id) = view.window_id() else {
+            return TimerToken::INVALID;
+        };
+
+        let action = move |token| {
+            let current_view = get_current_view();
+            set_current_view(view.root());
+            action(token);
+            set_current_view(current_view);
+        };
+
+        let token = TimerToken::next();
+        add_app_update_event(AppUpdateEvent::RequestAnimationTimer {
+            timer: Timer {
+                token,
+                action: Box::new(action),
+                deadline: Instant::now(),
+                is_animation: true,
+                window_id: Some(window_id),
+            },
+            window_id,
+        });
+        token
     }
 
     // Note: get_transform/set_transform removed as Renderer doesn't expose transform()

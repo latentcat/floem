@@ -11,7 +11,7 @@ use backdrop_blur::{
 use floem_renderer::BackdropBlur;
 use floem_renderer::gpu_resources::GpuResources;
 use floem_renderer::text::{Glyph, GlyphRunProps};
-use floem_renderer::{Img, Renderer};
+use floem_renderer::{Img, Renderer, WgpuRenderContext, WgpuSceneCommand};
 use peniko::kurbo::Size;
 use peniko::{
     Blob, BrushRef,
@@ -31,6 +31,7 @@ mod backdrop_blur;
 enum RenderSegment {
     Scene(Scene),
     BackdropBlur(BackdropBlurCommand),
+    WgpuScene(WgpuSceneCommand),
 }
 
 pub struct VelloRenderer {
@@ -397,6 +398,17 @@ impl Renderer for VelloRenderer {
         self.segments.push(RenderSegment::BackdropBlur(command));
     }
 
+    fn draw_wgpu_scene(&mut self, mut command: WgpuSceneCommand) {
+        command.rect = transform_rect(command.rect, self.device_transform());
+        if command.rect.area() <= 0.0 || !finite_rect(command.rect) {
+            return;
+        }
+
+        let scene = mem::replace(&mut self.scene, Scene::new());
+        self.segments.push(RenderSegment::Scene(scene));
+        self.segments.push(RenderSegment::WgpuScene(command));
+    }
+
     fn draw_svg<'b>(
         &mut self,
         svg: floem_renderer::Svg<'b>,
@@ -628,6 +640,18 @@ impl VelloRenderer {
                         surface_size,
                     );
                 }
+                RenderSegment::WgpuScene(mut command) => {
+                    let mut context = WgpuRenderContext {
+                        device: &self.device,
+                        queue: &self.queue,
+                        encoder: &mut encoder,
+                        target_view: &self.surface.target_view,
+                        target_format: texture_format,
+                        surface_size,
+                        rect: command.rect,
+                    };
+                    (command.callback)(&mut context);
+                }
             }
         }
 
@@ -736,6 +760,24 @@ impl VelloRenderer {
             height,
         }))
     }
+}
+
+fn finite_rect(rect: Rect) -> bool {
+    rect.x0.is_finite() && rect.y0.is_finite() && rect.x1.is_finite() && rect.y1.is_finite()
+}
+
+fn transform_rect(rect: Rect, transform: Affine) -> Rect {
+    let p0 = transform * rect.origin();
+    let p1 = transform * Point::new(rect.x1, rect.y0);
+    let p2 = transform * Point::new(rect.x0, rect.y1);
+    let p3 = transform * Point::new(rect.x1, rect.y1);
+
+    Rect::new(
+        p0.x.min(p1.x).min(p2.x).min(p3.x),
+        p0.y.min(p1.y).min(p2.y).min(p3.y),
+        p0.x.max(p1.x).max(p2.x).max(p3.x),
+        p0.y.max(p1.y).max(p2.y).max(p3.y),
+    )
 }
 
 fn common_alpha_mask_scene(

@@ -50,7 +50,7 @@
 use std::sync::Arc;
 
 use floem_renderer::gpu_resources::GpuResources;
-use floem_renderer::{BackdropBlur, Img};
+use floem_renderer::{BackdropBlur, Img, WgpuSceneCommand};
 #[cfg(feature = "skia")]
 use floem_skia_renderer::SkiaRenderer as ActiveRenderer;
 use floem_tiny_skia_renderer::TinySkiaRenderer;
@@ -374,6 +374,18 @@ impl floem_renderer::Renderer for Renderer {
             }
             Renderer::TinySkia(v) => {
                 v.draw_backdrop_blur(blur);
+            }
+            Renderer::Uninitialized { .. } => {}
+        }
+    }
+
+    fn draw_wgpu_scene(&mut self, command: WgpuSceneCommand) {
+        match self {
+            Renderer::Active(v) => {
+                v.draw_wgpu_scene(command);
+            }
+            Renderer::TinySkia(v) => {
+                v.draw_wgpu_scene(command);
             }
             Renderer::Uninitialized { .. } => {}
         }

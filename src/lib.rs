@@ -225,9 +225,9 @@ pub(crate) use box_tree::{bump_focus_nav_meta_revision, focus_nav_meta_revision}
 
 pub use app::{AppConfig, AppEvent, Application, launch, quit_app, reopen};
 pub use floem_reactive as reactive;
-pub use floem_renderer::Renderer;
 pub use floem_renderer::Svg as RendererSvg;
 pub use floem_renderer::gpu_resources::GpuResources;
+pub use floem_renderer::{Renderer, WgpuRenderContext};
 pub use imbl;
 pub use layout::ScreenLayout;
 #[cfg(not(target_arch = "wasm32"))]

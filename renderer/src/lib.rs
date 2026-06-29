@@ -23,7 +23,7 @@
 pub mod text;
 use peniko::{
     BlendMode, BrushRef,
-    kurbo::{Affine, Point, Rect, Shape, Stroke},
+    kurbo::{Affine, Point, Rect, Shape, Size, Stroke},
 };
 pub use resvg::tiny_skia;
 pub use resvg::usvg;
@@ -88,6 +88,27 @@ pub struct BackdropBlur {
     pub radius: f64,
     /// Uniform corner radius in the same logical units as `rect`.
     pub corner_radius: f64,
+}
+
+/// Context passed to custom wgpu render commands during the current renderer frame.
+///
+/// The callback should encode commands into `encoder` targeting `target_view`.
+/// It must not submit the encoder or perform GPU readback.
+pub struct WgpuRenderContext<'a> {
+    pub device: &'a wgpu::Device,
+    pub queue: &'a wgpu::Queue,
+    pub encoder: &'a mut wgpu::CommandEncoder,
+    pub target_view: &'a wgpu::TextureView,
+    pub target_format: wgpu::TextureFormat,
+    pub surface_size: Size,
+    pub rect: Rect,
+}
+
+pub type WgpuSceneCallback = dyn for<'a> FnMut(&mut WgpuRenderContext<'a>) + 'static;
+
+pub struct WgpuSceneCommand {
+    pub rect: Rect,
+    pub callback: Box<WgpuSceneCallback>,
 }
 
 /// The core rendering trait that every Floem backend must implement.
@@ -214,6 +235,11 @@ pub trait Renderer {
     ///
     /// Backends that cannot sample the current render target may ignore this.
     fn draw_backdrop_blur(&mut self, _blur: BackdropBlur) {}
+
+    /// Encode a custom wgpu scene directly into the current renderer target.
+    ///
+    /// Backends that do not expose a compatible wgpu frame may ignore this.
+    fn draw_wgpu_scene(&mut self, _command: WgpuSceneCommand) {}
 
     /// Finish the current frame and present it.
     ///
