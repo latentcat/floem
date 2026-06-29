@@ -57,6 +57,7 @@ pub struct VelloRenderer {
     svg_cache: HashMap<Vec<u8>, (bool, Scene)>,
     /// Current cache generation; toggled each frame so stale entries are evicted.
     cache_generation: bool,
+    surface_copy_dst: bool,
 }
 
 impl VelloRenderer {
@@ -99,9 +100,17 @@ impl VelloRenderer {
         let surface_caps = surface.get_capabilities(&adapter);
         let texture_format = surface_caps
             .formats
-            .into_iter()
+            .iter()
+            .copied()
             .find(|it| matches!(it, TextureFormat::Rgba8Unorm | TextureFormat::Bgra8Unorm))
             .ok_or_else(|| anyhow::anyhow!("surface should support Rgba8Unorm or Bgra8Unorm"))?;
+        let surface_copy_dst = texture_format == TextureFormat::Rgba8Unorm
+            && surface_caps.usages.contains(wgpu::TextureUsages::COPY_DST);
+        let surface_usage = if surface_copy_dst {
+            wgpu::TextureUsages::RENDER_ATTACHMENT.union(wgpu::TextureUsages::COPY_DST)
+        } else {
+            wgpu::TextureUsages::RENDER_ATTACHMENT
+        };
 
         let latency = match adapter.get_info().backend {
             wgpu::Backend::Vulkan => 2,
@@ -109,7 +118,7 @@ impl VelloRenderer {
         };
 
         let config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            usage: surface_usage,
             format: texture_format,
             width,
             height,
@@ -178,6 +187,7 @@ impl VelloRenderer {
             font_embolden,
             svg_cache: HashMap::new(),
             cache_generation: false,
+            surface_copy_dst,
         })
     }
 
@@ -519,21 +529,7 @@ impl Renderer for VelloRenderer {
                 self.render_segmented_frame();
             }
 
-            // Perform the copy
-            let mut encoder = self
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Surface Blit"),
-                });
-            self.surface.blitter.copy(
-                &self.device,
-                &mut encoder,
-                &self.surface.target_view,
-                &surface_texture
-                    .texture
-                    .create_view(&wgpu::TextureViewDescriptor::default()),
-            );
-            self.queue.submit([encoder.finish()]);
+            self.present_target_to_surface(&surface_texture);
 
             // Queue the texture to be presented on the surface
             surface_texture.present();
@@ -547,12 +543,58 @@ impl Renderer for VelloRenderer {
         let mut out = String::new();
         writeln!(out, "name: Vello").ok();
         writeln!(out, "info: {:#?}", self.adapter.get_info()).ok();
+        writeln!(out, "surface_format: {:?}", self.surface.config.format).ok();
+        writeln!(
+            out,
+            "present_path: {}",
+            if self.surface_copy_dst {
+                "copy_texture_to_texture"
+            } else {
+                "texture_blitter"
+            }
+        )
+        .ok();
 
         out
     }
 }
 
 impl VelloRenderer {
+    fn present_target_to_surface(&mut self, surface_texture: &wgpu::SurfaceTexture) {
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some(if self.surface_copy_dst {
+                    "Surface Copy"
+                } else {
+                    "Surface Blit"
+                }),
+            });
+
+        if self.surface_copy_dst {
+            encoder.copy_texture_to_texture(
+                self.surface.target_texture.as_image_copy(),
+                surface_texture.texture.as_image_copy(),
+                wgpu::Extent3d {
+                    width: self.surface.config.width,
+                    height: self.surface.config.height,
+                    depth_or_array_layers: 1,
+                },
+            );
+        } else {
+            self.surface.blitter.copy(
+                &self.device,
+                &mut encoder,
+                &self.surface.target_view,
+                &surface_texture
+                    .texture
+                    .create_view(&wgpu::TextureViewDescriptor::default()),
+            );
+        }
+
+        self.queue.submit([encoder.finish()]);
+    }
+
     fn render_segmented_frame(&mut self) {
         let width = self.surface.config.width.max(1);
         let height = self.surface.config.height.max(1);
@@ -574,6 +616,10 @@ impl VelloRenderer {
         for segment in segments {
             match segment {
                 RenderSegment::Scene(scene) => {
+                    if scene.encoding().is_empty() {
+                        continue;
+                    }
+
                     let segment_texture = self.scratch_textures.get(
                         &self.device,
                         width,
