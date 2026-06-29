@@ -1,177 +1,336 @@
-use floem::peniko::Brush;
-use floem::prelude::palette::css;
-use floem::prelude::*;
-use floem::reactive::Effect;
-use floem::style::{BorderTopColor, BoxShadow, CustomStylable};
-use floem::taffy::AlignContent;
-use floem::theme::StyleThemeExt;
+use floem::{
+    AnyView, IntoView,
+    icons::{self as icon_library, IconLibrary},
+    peniko::Color,
+    prelude::*,
+    taffy::FlexWrap,
+    text::FontWeight,
+    theme::StyleThemeExt,
+    views::{Button, Decorators},
+};
 
-#[derive(Clone)]
-struct TabContent {
-    idx: usize,
-    name: String,
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TabsVariant {
+    Default,
+    Line,
 }
 
-impl TabContent {
-    fn new(tabs_count: usize) -> Self {
-        Self {
-            idx: tabs_count,
-            name: "Tab with index".to_string(),
-        }
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TabsOrientation {
+    Horizontal,
+    Vertical,
+}
+
+fn icon(name: &'static str, size: f64) -> AnyView {
+    icon_library::icon(IconLibrary::Lucide, name)
+        .map(|icon| {
+            icon.style(move |s| s.size(size, size).flex_shrink(0.0))
+                .into_any()
+        })
+        .unwrap_or_else(|| Empty::new().style(move |s| s.size(size, size)).into_any())
+}
+
+fn trigger_content(label: &'static str, icon_name: Option<&'static str>) -> AnyView {
+    if let Some(icon_name) = icon_name {
+        Stack::horizontal((icon(icon_name, 14.0), label))
+            .style(|s| s.items_center().gap(6.0))
+            .into_any()
+    } else {
+        label.into_any()
     }
 }
 
-#[derive(Clone)]
-enum Action {
-    Add,
-    Remove,
-    None,
+fn tabs_trigger(
+    label: &'static str,
+    icon_name: Option<&'static str>,
+    index: usize,
+    active: RwSignal<usize>,
+    variant: TabsVariant,
+    orientation: TabsOrientation,
+    disabled: bool,
+) -> Button {
+    Button::new(trigger_content(label, icon_name))
+        .action(move || {
+            if !disabled {
+                active.set(index);
+            }
+        })
+        .style(move |s| {
+            let selected = active.get() == index;
+            let base = s
+                .height(26.0)
+                .padding_horiz(6.0)
+                .padding_vert(0.0)
+                .border(1.0)
+                .border_radius(6.0)
+                .corner_smoothing(0.6)
+                .font_size(14.0)
+                .font_weight(FontWeight::MEDIUM)
+                .background(Color::TRANSPARENT)
+                .border_color(Color::TRANSPARENT)
+                .with_theme(|s, t| {
+                    s.color(t.def(|t| t.foreground.with_alpha(if t.is_dark { 0.7 } else { 0.6 })))
+                        .hover(|s| s.color(t.foreground()))
+                        .disabled(|s| s.set(floem::style::Opacity, 0.5).unset_cursor())
+                })
+                .apply_if(disabled, |s| s.set_disabled(true));
+
+            match variant {
+                TabsVariant::Default => base
+                    .apply_if(orientation == TabsOrientation::Vertical, |s| {
+                        s.width_full().justify_start()
+                    })
+                    .apply_if(selected, |s| {
+                        s.box_shadow_v_offset(1.0)
+                            .box_shadow_blur(2.0)
+                            .box_shadow_color(Color::from_rgb8(0, 0, 0).with_alpha(0.08))
+                            .with_theme(|s, t| {
+                                s.background(t.background())
+                                    .color(t.foreground())
+                                    .border_color(t.def(|t| {
+                                        if t.is_dark {
+                                            t.input
+                                        } else {
+                                            Color::TRANSPARENT
+                                        }
+                                    }))
+                            })
+                    }),
+                TabsVariant::Line => base
+                    .height(32.0)
+                    .border(0.0)
+                    .border_radius(0.0)
+                    .background(Color::TRANSPARENT)
+                    .apply_if(orientation == TabsOrientation::Horizontal, |s| {
+                        s.border_bottom(2.0)
+                    })
+                    .apply_if(orientation == TabsOrientation::Vertical, |s| {
+                        s.width_full().justify_start().border_right(2.0)
+                    })
+                    .apply_if(selected, |s| {
+                        s.with_theme(|s, t| s.color(t.foreground()).border_color(t.foreground()))
+                    }),
+            }
+        })
 }
 
-pub fn tab_view() -> impl IntoView {
-    let tabs = RwSignal::new(vec![]);
-    let active_tab = RwSignal::new(None::<usize>);
-    let tab_action = RwSignal::new(Action::None);
+fn tabs_list(
+    active: RwSignal<usize>,
+    variant: TabsVariant,
+    orientation: TabsOrientation,
+    items: [(&'static str, Option<&'static str>, bool); 3],
+) -> AnyView {
+    let triggers = (
+        tabs_trigger(
+            items[0].0,
+            items[0].1,
+            0,
+            active,
+            variant,
+            orientation,
+            items[0].2,
+        ),
+        tabs_trigger(
+            items[1].0,
+            items[1].1,
+            1,
+            active,
+            variant,
+            orientation,
+            items[1].2,
+        ),
+        tabs_trigger(
+            items[2].0,
+            items[2].1,
+            2,
+            active,
+            variant,
+            orientation,
+            items[2].2,
+        ),
+    );
 
-    Effect::new(move |_| match tab_action.get() {
-        Action::Add => {
-            tabs.update(|tabs| tabs.push(TabContent::new(tabs.len())));
-        }
-        Action::Remove => {
-            tabs.update(|tabs| {
-                tabs.pop();
-            });
-        }
-        Action::None => (),
-    });
-
-    let tabs_view = dyn_stack(
-        move || tabs.get(),
-        |tab| tab.idx,
-        move |tab| {
-            tab_side_item(tab.clone(), active_tab).action(move || {
-                active_tab.update(|a| {
-                    *a = Some(tab.idx);
-                });
+    match orientation {
+        TabsOrientation::Horizontal => Stack::horizontal(triggers)
+            .style(move |s| match variant {
+                TabsVariant::Default => s
+                    .height(32.0)
+                    .items_center()
+                    .gap(0.0)
+                    .padding(3.0)
+                    .border_radius(8.0)
+                    .corner_smoothing(0.6)
+                    .with_theme(|s, t| s.background(t.muted()).color(t.muted_foreground())),
+                TabsVariant::Line => s
+                    .height(36.0)
+                    .items_center()
+                    .gap(4.0)
+                    .padding(0.0)
+                    .background(Color::TRANSPARENT),
             })
-        },
-    )
-    .style(|s| s.flex_col().width_full().row_gap(5.))
-    .scroll()
-    .action(move || {
-        if active_tab.with_untracked(|act| act.is_some()) {
-            active_tab.set(None)
-        }
-    })
-    .style(|s| s.size_full().padding(5.).padding_right(7.))
-    .custom_style(|s| s.shrink_to_fit())
-    .style(|s| {
-        s.width(140.)
-            .min_width(140.)
-            .height_full()
-            .border_right(1.)
-            .with_theme(|s, t| s.border_color(t.border_muted()))
-    });
+            .into_any(),
+        TabsOrientation::Vertical => Stack::vertical(triggers)
+            .style(move |s| match variant {
+                TabsVariant::Default => s
+                    .width(184.0)
+                    .items_stretch()
+                    .gap(0.0)
+                    .padding(3.0)
+                    .border_radius(8.0)
+                    .corner_smoothing(0.6)
+                    .with_theme(|s, t| s.background(t.muted()).color(t.muted_foreground())),
+                TabsVariant::Line => s
+                    .width(184.0)
+                    .items_stretch()
+                    .gap(4.0)
+                    .padding(0.0)
+                    .background(Color::TRANSPARENT),
+            })
+            .into_any(),
+    }
+}
 
-    let tabs_content_view = tab(
-        move || active_tab.get(),
-        move || tabs.get(),
-        |tab| tab.idx,
-        show_tab_content,
-    )
-    .style(|s| s.size_full());
+fn tabs_content(active: RwSignal<usize>) -> impl IntoView {
+    dyn_view(move || {
+        let (title, body) = match active.get() {
+            0 => (
+                "Account",
+                "Manage account details and authentication settings.",
+            ),
+            1 => ("Password", "Update credentials and recovery options."),
+            _ => (
+                "Billing",
+                "Review plan limits, invoices, and payment methods.",
+            ),
+        };
 
-    Stack::vertical((
-        Stack::horizontal((
-            Button::new("add tab").action(move || {
-                tab_action.update(|a| {
-                    *a = Action::Add;
-                })
+        Stack::vertical((
+            title.style(|s| {
+                s.font_size(14.0)
+                    .font_weight(FontWeight::SEMI_BOLD)
+                    .with_theme(|s, t| s.color(t.foreground()))
             }),
-            Button::new("remove tab").action(move || {
-                tab_action.update(|a| {
-                    *a = Action::Remove;
-                })
+            body.style(|s| {
+                s.font_size(13.0)
+                    .line_height(1.35)
+                    .with_theme(|s, t| s.color(t.muted_foreground()))
             }),
         ))
         .style(|s| {
-            s.height(40.pt())
-                .width_full()
-                .border_bottom(1.)
-                .with_theme(|s, t| s.border_color(t.border_muted()))
-                .padding(5.)
-                .col_gap(5.)
-                .items_center()
-                .align_content(AlignContent::SpaceAround)
-        }),
-        Stack::new((tabs_view, tabs_content_view)).style(|s| s.height(400.pt()).width(500.pt())),
-    ))
-    .style(|s| s.size_full())
-    .container()
-    .style(|s| {
-        s.size_full()
-            .padding(10.)
-            .with_theme(|s, t| s.border_color(t.border_muted()))
-    })
-}
-
-fn show_tab_content(tab: TabContent) -> impl IntoView {
-    Stack::vertical((
-        tab.name.style(|s| s.font_size(15.).font_bold()),
-        Label::derived(move || format!("{}", tab.idx)).style(|s| s.font_size(20.).font_bold()),
-        "is now active".style(|s| s.font_size(13.)),
-    ))
-    .style(|s| {
-        s.size(150.pt(), 150.pt())
-            .items_center()
-            .justify_center()
-            .row_gap(10.)
-            .border_radius(7.)
-            .border_top(0.6)
-            .with_theme(|s, t| {
-                s.background(t.bg_elevated()).set_context_opt(
-                    BorderTopColor,
-                    t.def(|t| {
-                        Some(if t.is_dark {
-                            Brush::Solid(t.border())
-                        } else {
-                            Brush::Solid(css::WHITE)
-                        })
-                    }),
-                )
-            })
-            .border_bottom_color(css::BLACK.multiply_alpha(0.7))
-            .apply_box_shadows(vec![
-                BoxShadow::new()
-                    .color(css::BLACK.multiply_alpha(0.3))
-                    .top_offset(-13.)
-                    .bottom_offset(0.4)
-                    .right_offset(-4.)
-                    .left_offset(-4.)
-                    .blur_radius(2.)
-                    .spread(1.),
-                BoxShadow::new()
-                    .color(css::BLACK.multiply_alpha(0.3))
-                    .top_offset(-15.)
-                    .bottom_offset(4.)
-                    .right_offset(-6.)
-                    .left_offset(-6.)
-                    .blur_radius(5.)
-                    .spread(6.),
-            ])
-    })
-    .container()
-    .style(|s| s.size_full().items_center().justify_center())
-}
-
-fn tab_side_item(tab: TabContent, act_tab: RwSignal<Option<usize>>) -> impl IntoView {
-    Label::new(format!("{} {}", tab.name, tab.idx))
-        .button()
-        .style(move |s| {
-            s.width_full()
-                .height(36.pt())
-                .apply_if(act_tab.get().is_some_and(|a| a == tab.idx), |s| {
-                    s.with_theme(|s, t| s.border_color(t.primary()))
-                })
+            s.flex_col()
+                .gap(6.0)
+                .padding(14.0)
+                .border(1.0)
+                .border_radius(8.0)
+                .corner_smoothing(0.6)
+                .with_theme(|s, t| s.background(t.card()).border_color(t.border()))
         })
+    })
+}
+
+fn section(title: &'static str, content: impl IntoView + 'static) -> AnyView {
+    Stack::vertical((
+        title.style(|s| {
+            s.font_size(14.0)
+                .font_weight(FontWeight::SEMI_BOLD)
+                .with_theme(|s, t| s.color(t.foreground()))
+        }),
+        content,
+    ))
+    .style(|s| s.flex_col().gap(10.0))
+    .into_any()
+}
+
+pub fn tab_view() -> impl IntoView {
+    let default_tab = RwSignal::new(0usize);
+    let line_tab = RwSignal::new(0usize);
+    let icon_tab = RwSignal::new(0usize);
+    let vertical_tab = RwSignal::new(0usize);
+
+    Stack::vertical((
+        "Tabs".style(|s| {
+            s.font_size(20.0)
+                .font_weight(FontWeight::SEMI_BOLD)
+                .with_theme(|s, t| s.color(t.foreground()))
+        }),
+        section(
+            "Default",
+            Stack::vertical((
+                tabs_list(
+                    default_tab,
+                    TabsVariant::Default,
+                    TabsOrientation::Horizontal,
+                    [
+                        ("Account", None, false),
+                        ("Password", None, false),
+                        ("Billing", None, false),
+                    ],
+                ),
+                tabs_content(default_tab),
+            ))
+            .style(|s| s.flex_col().gap(10.0).max_width(460.0)),
+        ),
+        section(
+            "Line",
+            Stack::vertical((
+                tabs_list(
+                    line_tab,
+                    TabsVariant::Line,
+                    TabsOrientation::Horizontal,
+                    [
+                        ("Preview", None, false),
+                        ("Code", None, false),
+                        ("Activity", None, false),
+                    ],
+                ),
+                tabs_content(line_tab),
+            ))
+            .style(|s| s.flex_col().gap(10.0).max_width(460.0)),
+        ),
+        section(
+            "Icons & Disabled",
+            Stack::vertical((
+                tabs_list(
+                    icon_tab,
+                    TabsVariant::Default,
+                    TabsOrientation::Horizontal,
+                    [
+                        ("Overview", Some("layout-dashboard"), false),
+                        ("Files", Some("folder"), false),
+                        ("Archive", Some("archive"), true),
+                    ],
+                ),
+                tabs_content(icon_tab),
+            ))
+            .style(|s| s.flex_col().gap(10.0).max_width(460.0)),
+        ),
+        section(
+            "Vertical",
+            Stack::horizontal((
+                tabs_list(
+                    vertical_tab,
+                    TabsVariant::Line,
+                    TabsOrientation::Vertical,
+                    [
+                        ("Profile", Some("user"), false),
+                        ("Security", Some("shield"), false),
+                        ("Billing", Some("credit-card"), false),
+                    ],
+                ),
+                tabs_content(vertical_tab).style(|s| s.width(360.0)),
+            ))
+            .style(|s| {
+                s.items_start()
+                    .gap(16.0)
+                    .flex_wrap(floem::taffy::FlexWrap::Wrap)
+            }),
+        ),
+    ))
+    .style(|s| {
+        s.flex_col()
+            .gap(24.0)
+            .padding(30.0)
+            .flex_wrap(FlexWrap::Wrap)
+            .with_theme(|s, t| s.background(t.background()).color(t.foreground()))
+    })
 }

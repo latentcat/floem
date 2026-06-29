@@ -27,25 +27,31 @@ fn kbd(label: &'static str) -> AnyView {
 }
 
 fn kbd_icon(name: &'static str) -> AnyView {
-    icon_library::icon(IconLibrary::Lucide, name)
-        .map(|icon| {
-            icon.style(|s| {
-                s.height(20.0)
-                    .min_width(20.0)
-                    .padding_horiz(4.0)
-                    .border_radius(2.0)
-                    .corner_smoothing(0.6)
-                    .with_theme(|s, t| s.background(t.muted()).color(t.muted_foreground()))
-                    .class(SvgClass, |s| s.size(12.0, 12.0))
-            })
-            .into_any()
-        })
+    let icon = icon_library::icon(IconLibrary::Lucide, name)
+        .map(|icon| icon.style(|s| s.size(12.0, 12.0)).into_any())
         .unwrap_or_else(|| kbd("?"))
+        .into_any();
+
+    Stack::new((icon,))
+        .style(|s| {
+            s.height(20.0)
+                .min_width(20.0)
+                .padding_horiz(4.0)
+                .items_center()
+                .justify_center()
+                .border_radius(2.0)
+                .corner_smoothing(0.6)
+                .with_theme(|s, t| s.background(t.muted()).color(t.muted_foreground()))
+        })
+        .into_any()
 }
 
 fn plus() -> AnyView {
-    "+".style(|s| s.font_size(12.0).with_theme(|s, t| s.color(t.muted_foreground())))
-        .into_any()
+    "+".style(|s| {
+        s.font_size(12.0)
+            .with_theme(|s, t| s.color(t.muted_foreground()))
+    })
+    .into_any()
 }
 
 pub fn kbd_view() -> impl IntoView {

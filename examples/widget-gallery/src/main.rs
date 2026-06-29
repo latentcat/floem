@@ -1,32 +1,78 @@
+pub mod accordion;
+pub mod alert;
+pub mod alert_dialog;
 pub mod animation;
+pub mod aspect_ratio;
+pub mod attachment;
+pub mod avatar;
 pub mod background_blur;
 pub mod badge;
 pub mod bevy_render_test;
+pub mod breadcrumb;
+pub mod bubble;
+pub mod button_group;
 pub mod buttons;
+pub mod calendar;
 pub mod canvas;
 pub mod card;
+pub mod carousel;
+pub mod chart;
 pub mod checkbox;
 pub mod clipboard;
+pub mod collapsible;
+pub mod combobox;
+pub mod command;
 pub mod context_menu;
 pub mod corner_smoothing;
+pub mod dialog;
+pub mod direction;
 pub mod draggable;
+pub mod drawer;
 pub mod dropdown;
+pub mod dropdown_menu;
 pub mod dropped_file;
+pub mod empty_state;
+pub mod field;
 pub mod form;
+pub mod hover_card;
 pub mod icons;
 pub mod images;
+pub mod input_group;
+pub mod input_otp;
 pub mod inputs;
+pub mod item;
+pub mod kbd;
 pub mod labels;
 pub mod lists;
+pub mod marker;
+pub mod menubar;
+pub mod message;
+pub mod message_scroller;
+pub mod native_select;
+pub mod navigation_menu;
+pub mod pagination;
+pub mod popover;
+pub mod progress;
 pub mod radio_buttons;
 pub mod render_test_common;
+pub mod resizable;
 pub mod rich_text;
+pub mod scroll_area;
+pub mod select;
 pub mod separator;
+pub mod sheet;
 pub mod skeleton;
 pub mod slider;
+pub mod sonner;
+pub mod spinner;
 pub mod switch;
+pub mod table;
 pub mod tabs;
+pub mod textarea;
 pub mod texteditor;
+pub mod toggle;
+pub mod toggle_group;
+pub mod tooltip;
 pub mod wgpu_render_test;
 
 use floem::{
@@ -111,12 +157,59 @@ fn app_view(window_id: WindowId) -> impl IntoView {
     let tabs: Vec<&'static str> = vec![
         "Label",
         "Button",
+        "Accordion",
         "Badge",
+        "Alert",
+        "Alert Dialog",
+        "Attachment",
+        "Avatar",
+        "Aspect Ratio",
+        "Breadcrumb",
+        "Bubble",
+        "Button Group",
+        "Calendar",
+        "Carousel",
+        "Combobox",
+        "Command",
+        "Collapsible",
+        "Context Menu",
+        "Dialog",
+        "Direction",
+        "Drawer",
+        "Dropdown Menu",
+        "Empty",
+        "Field",
+        "Hover Card",
+        "Input OTP",
+        "Input Group",
+        "Item",
+        "Kbd",
+        "Marker",
+        "Menubar",
+        "Message",
+        "Message Scroller",
+        "Native Select",
+        "Navigation Menu",
+        "Pagination",
+        "Popover",
         "Switch",
         "Icon",
         "Card",
+        "Chart",
+        "Scroll Area",
+        "Select",
         "Separator",
+        "Sheet",
         "Skeleton",
+        "Progress",
+        "Resizable",
+        "Spinner",
+        "Sonner",
+        "Table",
+        "Textarea",
+        "Toggle",
+        "Toggle Group",
+        "Tooltip",
         "Input",
         "Text Editor",
         "Lists",
@@ -144,12 +237,59 @@ fn app_view(window_id: WindowId) -> impl IntoView {
         match it {
             "Label" => labels::label_view().into_any(),
             "Button" => buttons::button_view().into_any(),
+            "Accordion" => accordion::accordion_view().into_any(),
             "Badge" => badge::badge_view().into_any(),
+            "Alert" => alert::alert_view().into_any(),
+            "Alert Dialog" => alert_dialog::alert_dialog_view().into_any(),
+            "Attachment" => attachment::attachment_view().into_any(),
+            "Avatar" => avatar::avatar_view().into_any(),
+            "Aspect Ratio" => aspect_ratio::aspect_ratio_view().into_any(),
+            "Breadcrumb" => breadcrumb::breadcrumb_view().into_any(),
+            "Bubble" => bubble::bubble_view().into_any(),
+            "Button Group" => button_group::button_group_view().into_any(),
+            "Calendar" => calendar::calendar_view().into_any(),
+            "Carousel" => carousel::carousel_view().into_any(),
+            "Combobox" => combobox::combobox_view().into_any(),
+            "Command" => command::command_view().into_any(),
+            "Collapsible" => collapsible::collapsible_view().into_any(),
+            "Context Menu" => context_menu::menu_view().into_any(),
+            "Dialog" => dialog::dialog_view().into_any(),
+            "Direction" => direction::direction_view().into_any(),
+            "Drawer" => drawer::drawer_view().into_any(),
+            "Dropdown Menu" => dropdown_menu::dropdown_menu_view().into_any(),
+            "Empty" => empty_state::empty_view().into_any(),
+            "Field" => field::field_view().into_any(),
+            "Hover Card" => hover_card::hover_card_view().into_any(),
+            "Input OTP" => input_otp::input_otp_view().into_any(),
+            "Input Group" => input_group::input_group_view().into_any(),
+            "Item" => item::item_view().into_any(),
+            "Kbd" => kbd::kbd_view().into_any(),
+            "Marker" => marker::marker_view().into_any(),
+            "Menubar" => menubar::menubar_view().into_any(),
+            "Message" => message::message_view().into_any(),
+            "Message Scroller" => message_scroller::message_scroller_view().into_any(),
+            "Native Select" => native_select::native_select_view().into_any(),
+            "Navigation Menu" => navigation_menu::navigation_menu_view().into_any(),
+            "Pagination" => pagination::pagination_view().into_any(),
+            "Popover" => popover::popover_view().into_any(),
             "Switch" => switch::switch_view().into_any(),
             "Icon" => icons::icons_view().into_any(),
             "Card" => card::card_view().into_any(),
+            "Chart" => chart::chart_view().into_any(),
+            "Scroll Area" => scroll_area::scroll_area_view().into_any(),
+            "Select" => select::select_view().into_any(),
             "Separator" => separator::separator_view().into_any(),
+            "Sheet" => sheet::sheet_view().into_any(),
             "Skeleton" => skeleton::skeleton_view().into_any(),
+            "Progress" => progress::progress_view().into_any(),
+            "Resizable" => resizable::resizable_view().into_any(),
+            "Spinner" => spinner::spinner_view().into_any(),
+            "Sonner" => sonner::sonner_view().into_any(),
+            "Table" => table::table_view().into_any(),
+            "Textarea" => textarea::textarea_view().into_any(),
+            "Toggle" => toggle::toggle_view().into_any(),
+            "Toggle Group" => toggle_group::toggle_group_view().into_any(),
+            "Tooltip" => tooltip::tooltip_view().into_any(),
             "Checkbox" => checkbox::checkbox_view().into_any(),
             "Radio" => radio_buttons::radio_buttons_view().into_any(),
             "Input" => inputs::text_input_view().into_any(),

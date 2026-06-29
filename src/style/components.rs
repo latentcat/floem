@@ -47,6 +47,7 @@ pub enum CursorStyle {
     Pointer,
     Progress,
     Wait,
+    NotAllowed,
     Crosshair,
     Text,
     Move,

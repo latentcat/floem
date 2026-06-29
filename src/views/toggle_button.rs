@@ -29,15 +29,19 @@ use crate::{
     views::Decorators,
 };
 
-const HANDLE_TRANSITION: Duration = Duration::from_millis(100);
+const HANDLE_TRANSITION: Duration = Duration::from_millis(150);
 
 prop!(pub ToggleButtonInset: Length {} = Length::Pt(0.));
+prop!(pub ToggleButtonUncheckedInset: Option<Length> {} = None);
+prop!(pub ToggleButtonCheckedInset: Option<Length> {} = None);
 prop!(pub ToggleButtonCircleRad: Length {} = Length::Pct(95.));
 
 prop_extractor! {
     ToggleStyle {
         foreground: Foreground,
         inset: ToggleButtonInset,
+        unchecked_inset: ToggleButtonUncheckedInset,
+        checked_inset: ToggleButtonCheckedInset,
         circle_rad: ToggleButtonCircleRad,
         font_size: FontSize,
         line_height: LineHeight,
@@ -77,9 +81,15 @@ impl Handle {
         }
     }
 
-    fn target_position(state: bool, width: f64, radius: f64, inset: f64) -> f64 {
-        let min = radius + inset;
-        let max = (width - radius - inset).max(min);
+    fn target_position(
+        state: bool,
+        width: f64,
+        radius: f64,
+        unchecked_inset: f64,
+        checked_inset: f64,
+    ) -> f64 {
+        let min = radius + unchecked_inset;
+        let max = (width - radius - checked_inset).max(min);
         if state { max } else { min }
     }
 
@@ -90,14 +100,30 @@ impl Handle {
         bt.set_local_bounds(self.element_id.0, rect);
     }
 
-    fn snap(&mut self, state: bool, size: Size, radius: f64, inset: f64) {
-        let target = Self::target_position(state, size.width, radius, inset);
+    fn snap(
+        &mut self,
+        state: bool,
+        size: Size,
+        radius: f64,
+        unchecked_inset: f64,
+        checked_inset: f64,
+    ) {
+        let target =
+            Self::target_position(state, size.width, radius, unchecked_inset, checked_inset);
         self.position.set_immediate(target);
         self.update_bounds(size, radius);
     }
 
-    fn transition_to_state(&mut self, state: bool, size: Size, radius: f64, inset: f64) -> bool {
-        let target = Self::target_position(state, size.width, radius, inset);
+    fn transition_to_state(
+        &mut self,
+        state: bool,
+        size: Size,
+        radius: f64,
+        unchecked_inset: f64,
+        checked_inset: f64,
+    ) -> bool {
+        let target =
+            Self::target_position(state, size.width, radius, unchecked_inset, checked_inset);
         if (self.position.get() - target).abs() < f64::EPSILON && !self.position.is_active() {
             self.update_bounds(size, radius);
             return false;
@@ -184,25 +210,52 @@ impl ToggleButton {
             .min(width / 2.0)
     }
 
+    fn resolve_inset(&self, inset: Length, width: f64) -> f64 {
+        inset
+            .resolve(width, &self.length_resolve_cx())
+            .min(width / 2.0)
+    }
+
+    fn unchecked_inset(&self, width: f64) -> f64 {
+        self.style
+            .unchecked_inset()
+            .map(|inset| self.resolve_inset(inset, width))
+            .unwrap_or_else(|| self.inset(width))
+    }
+
+    fn checked_inset(&self, width: f64) -> f64 {
+        self.style
+            .checked_inset()
+            .map(|inset| self.resolve_inset(inset, width))
+            .unwrap_or_else(|| self.inset(width))
+    }
+
     fn post_layout(&mut self) {
         self.set_handle_position(false);
     }
 
-    fn handle_geometry(&self) -> (Size, f64, f64) {
+    fn handle_geometry(&self) -> (Size, f64, f64, f64) {
         let size = self.id.get_layout_rect_local().size();
         let radius = self.circle_radius(size);
-        let inset = self.inset(size.width);
-        (size, radius, inset)
+        let unchecked_inset = self.unchecked_inset(size.width);
+        let checked_inset = self.checked_inset(size.width);
+        (size, radius, unchecked_inset, checked_inset)
     }
 
     fn set_handle_position(&mut self, animated: bool) {
-        let (size, radius, inset) = self.handle_geometry();
+        let (size, radius, unchecked_inset, checked_inset) = self.handle_geometry();
         if animated && size.width > 0.0 && size.height > 0.0 {
-            self.handle
-                .transition_to_state(self.state, size, radius, inset);
+            self.handle.transition_to_state(
+                self.state,
+                size,
+                radius,
+                unchecked_inset,
+                checked_inset,
+            );
             self.request_handle_animation_frame();
         } else {
-            self.handle.snap(self.state, size, radius, inset);
+            self.handle
+                .snap(self.state, size, radius, unchecked_inset, checked_inset);
             self.handle_animation_frame = false;
         }
         self.id.request_box_tree_commit();
@@ -211,7 +264,7 @@ impl ToggleButton {
     fn step_handle_animation(&mut self) {
         self.handle_animation_frame = false;
 
-        let (size, radius, _) = self.handle_geometry();
+        let (size, radius, _, _) = self.handle_geometry();
         if self.handle.step(&Instant::now(), size, radius) {
             self.id.request_box_tree_commit();
             self.id.request_paint();
@@ -349,6 +402,10 @@ impl View for ToggleButton {
             return EventPropagation::Continue;
         }
 
+        if self.id.is_disabled() {
+            return EventPropagation::Stop;
+        }
+
         if let Event::Interaction(InteractionEvent::Click) = &cx.event {
             self.state = !self.state;
             self.set_handle_position(true);
@@ -416,6 +473,18 @@ impl ToggleButtonCustomStyle {
     /// Sets the inset of the toggle handle from the edge.
     pub fn handle_inset(mut self, inset: impl Into<Length>) -> Self {
         self = Self(self.0.set(ToggleButtonInset, inset));
+        self
+    }
+
+    /// Sets the inset of the toggle handle from the start edge when unchecked.
+    pub fn unchecked_handle_inset(mut self, inset: impl Into<Length>) -> Self {
+        self = Self(self.0.set(ToggleButtonUncheckedInset, Some(inset.into())));
+        self
+    }
+
+    /// Sets the inset of the toggle handle from the end edge when checked.
+    pub fn checked_handle_inset(mut self, inset: impl Into<Length>) -> Self {
+        self = Self(self.0.set(ToggleButtonCheckedInset, Some(inset.into())));
         self
     }
 

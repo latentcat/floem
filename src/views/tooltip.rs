@@ -10,8 +10,10 @@ use crate::{
     event::{Event, EventPropagation, Phase},
     platform::Duration,
     prop, prop_extractor, style_class,
+    theme::StyleThemeExt,
+    unit::UnitExt,
     view::{IntoView, View, ViewId},
-    views::Decorators,
+    views::{Decorators, Empty, Stack},
 };
 
 style_class!(
@@ -80,11 +82,20 @@ impl View for Tooltip {
         {
             let point =
                 self.id.get_visual_origin() + self.hover_point.unwrap().0.to_vec2() + (0., 10.);
-            let overlay_id = add_overlay(
-                (self.tip)()
-                    .class(TooltipClass)
-                    .style(move |s| s.inset_left(point.x).inset_top(point.y)),
-            );
+            let arrow = Empty::new().style(|s| {
+                s.size(10.0, 10.0)
+                    .margin_bottom(-5.0)
+                    .rotate(45.0.deg())
+                    .border_radius(2.0)
+                    .with_theme(|s, t| s.background(t.foreground()))
+            });
+            let content = (self.tip)().class(TooltipClass);
+            let overlay_id = add_overlay(Stack::vertical((arrow, content)).style(move |s| {
+                s.inset_left(point.x)
+                    .inset_top(point.y)
+                    .items_center()
+                    .gap(0.0)
+            }));
             overlay_id.set_style_parent(self.id);
             *self.overlay.borrow_mut() = Some(overlay_id);
         }

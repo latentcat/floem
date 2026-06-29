@@ -122,17 +122,22 @@ fn icon_avatar(name: &'static str, size: AvatarSize) -> AnyView {
 
     let icon = icon_library::icon(IconLibrary::Lucide, name)
         .map(|icon| icon.style(move |s| s.size(icon_size, icon_size)).into_any())
-        .unwrap_or_else(|| Empty::new().style(move |s| s.size(icon_size, icon_size)).into_any());
+        .unwrap_or_else(|| {
+            Empty::new()
+                .style(move |s| s.size(icon_size, icon_size))
+                .into_any()
+        });
 
-    Stack::new((icon,)).style(move |s| {
-        s.size(px, px)
-            .items_center()
-            .justify_center()
-            .border_radius(100.0)
-            .corner_smoothing(0.6)
-            .with_theme(|s, t| s.background(t.muted()).color(t.muted_foreground()))
-    })
-    .into_any()
+    Stack::new((icon,))
+        .style(move |s| {
+            s.size(px, px)
+                .items_center()
+                .justify_center()
+                .border_radius(100.0)
+                .corner_smoothing(0.6)
+                .with_theme(|s, t| s.background(t.muted()).color(t.muted_foreground()))
+        })
+        .into_any()
 }
 
 pub fn avatar_view() -> impl IntoView {

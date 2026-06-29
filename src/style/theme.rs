@@ -12,8 +12,8 @@ use crate::{
         ButtonClass, CheckboxClass, LabelClass, LabelCustomExprStyle, LabelCustomStyle,
         LabeledCheckboxClass, LabeledRadioButtonClass, ListClass, ListItemClass,
         PlaceholderTextClass, RadioButtonClass, RadioButtonDotClass, SvgClass, TabSelectorClass,
-        TextInputClass, ToggleButtonCircleRad, ToggleButtonClass, ToggleButtonInset, TooltipClass,
-        dropdown,
+        TextInputClass, ToggleButtonCheckedInset, ToggleButtonCircleRad, ToggleButtonClass,
+        ToggleButtonInset, ToggleButtonUncheckedInset, TooltipClass, dropdown,
         resizable::{ResizableCustomExprStyle, ResizableCustomStyle},
         scroll,
         slider::{SliderClass, SliderCustomExprStyle, SliderCustomStyle},
@@ -325,6 +325,22 @@ impl DesignSystem {
 
     pub fn input_muted(&self) -> Color {
         self.input.with_alpha(if self.is_dark { 0.9 } else { 0.5 })
+    }
+
+    pub fn input_background(&self) -> Color {
+        if self.is_dark {
+            Color::from_rgb8(255, 255, 255).with_alpha(0.045)
+        } else {
+            css::TRANSPARENT
+        }
+    }
+
+    pub fn input_disabled_background(&self) -> Color {
+        if self.is_dark {
+            Color::from_rgb8(255, 255, 255).with_alpha(0.12)
+        } else {
+            self.input.with_alpha(0.5)
+        }
     }
 
     pub fn switch_unchecked(&self) -> Color {
@@ -702,6 +718,12 @@ impl ThemeExpr {
     pub fn input_muted(self) -> ContextValue<Color> {
         self.def(|t| t.input_muted())
     }
+    pub fn input_background(self) -> ContextValue<Color> {
+        self.def(|t| t.input_background())
+    }
+    pub fn input_disabled_background(self) -> ContextValue<Color> {
+        self.def(|t| t.input_disabled_background())
+    }
     pub fn switch_unchecked(self) -> ContextValue<Color> {
         self.def(|t| t.switch_unchecked())
     }
@@ -868,7 +890,7 @@ pub(crate) fn default_theme(os_theme: winit::window::Theme) -> Style {
         .padding_horiz(10.0)
         .padding_vert(0.0)
         .gap(6.0)
-        .border_radius(10.0)
+        .border_radius(8.0)
         .corner_smoothing(0.6)
         .border(1.0)
         .border_color(Color::TRANSPARENT)
@@ -889,40 +911,40 @@ pub(crate) fn default_theme(os_theme: winit::window::Theme) -> Style {
         .apply(focus_style());
 
     let checkbox_style = Style::new()
-        .size(20, 20)
+        .size(16, 16)
+        .padding(0.0)
+        .border(1.0)
+        .border_radius(4.0)
         .with_theme(|s, t| {
-            s.background(t.bg_base())
-                .active(|s| s.background(t.bg_elevated()))
+            s.background(t.input_background())
+                .border_color(t.input())
+                .color(t.primary_foreground())
+                .selected(|s| {
+                    s.background(t.primary())
+                        .border_color(t.primary())
+                        .color(t.primary_foreground())
+                })
                 .disabled(|s| {
-                    s.background(t.def(|t| t.bg_elevated().with_alpha(0.3)))
-                        .color(t.text_muted())
-                        .unset_cursor()
+                    s.set(Opacity, 0.5)
+                        .set(Cursor, Some(CursorStyle::NotAllowed))
                 })
         })
         .transition(Background, Transition::linear(100.millis()))
-        .focus(|s| s.with_theme(|s, t| s.hover(|s| s.background(t.bg_overlay()))))
+        .transition(Foreground, Transition::linear(100.millis()))
         .cursor(CursorStyle::Pointer)
-        .apply(border_style(true))
-        .apply(hover_style())
         .apply(focus_style());
 
     let labeled_checkbox_style = Style::new()
+        .padding(0.0)
         .with_theme(|s, t| {
-            s.hover(|s| s.background(t.def(|t| t.primary_muted().with_alpha(0.7))))
-                .col_gap(t.padding())
-                .padding(t.padding())
-                .border_radius(t.border_radius())
-                .active(|s| {
-                    s.class(CheckboxClass, |s| s.background(t.primary()))
-                        .background(t.primary())
-                })
+            s.col_gap(t.def(|_| Length::Pt(8.0)))
+                .color(t.foreground())
                 .disabled(|s| {
-                    s.unset_cursor()
-                        .color(t.text_muted())
+                    s.set(Opacity, 0.5)
+                        .set(Cursor, Some(CursorStyle::NotAllowed))
                         .class(CheckboxClass, |s| {
-                            s.background(t.bg_disabled())
-                                .color(t.text_muted())
-                                .hover(|s| s.background(t.def(|t| t.bg_elevated().with_alpha(0.3))))
+                            s.set(Opacity, 0.5)
+                                .set(Cursor, Some(CursorStyle::NotAllowed))
                         })
                 })
         })
@@ -930,64 +952,56 @@ pub(crate) fn default_theme(os_theme: winit::window::Theme) -> Style {
         .transition(Background, Transition::linear(100.millis()))
         .class(CheckboxClass, |s| s.focus_none())
         .selectable(false)
-        .focus(|s| {
-            s.class(CheckboxClass, |s| {
-                s.with_theme(|s, t| s.border_color(t.primary()))
-            })
-            .with_theme(|s, t| s.hover(|s| s.background(t.bg_overlay())))
-        })
-        .apply(hover_style())
+        .focus(|s| s.class(CheckboxClass, |s| s.apply(focus_style())))
         .apply(focus_style());
 
     let radio_button_style = Style::new()
-        .size(20, 20)
+        .size(16, 16)
+        .padding(0.0)
         .items_center()
         .justify_center()
+        .border(1.0)
         .with_theme(|s, t| {
-            s.background(t.bg_base())
-                .active(|s| s.background(t.bg_base()))
-                .hover(|s| s.background(t.bg_elevated()))
+            s.background(t.input_background())
+                .border_color(t.input())
+                .selected(|s| {
+                    s.background(t.primary())
+                        .border_color(t.primary())
+                        .color(t.primary_foreground())
+                })
                 .disabled(|s| {
-                    s.background(t.bg_disabled())
-                        .color(t.text_muted())
-                        .unset_cursor()
+                    s.set(Opacity, 0.5)
+                        .set(Cursor, Some(CursorStyle::NotAllowed))
                 })
         })
         .cursor(CursorStyle::Pointer)
         .transition(Background, Transition::linear(100.millis()))
-        .focus(|s| s.with_theme(|s, t| s.hover(|s| s.background(t.bg_overlay()))))
+        .transition(Foreground, Transition::linear(100.millis()))
         .border_radius(100.pct())
         .flex_shrink(0.)
-        .apply(border_style(false))
         .apply(focus_style());
 
     let radio_button_dot_style = Style::new()
         .size(8, 8)
         .border_radius(100.0)
-        .with_theme(|s, t| {
-            s.background(t.text()).disabled(|s| {
-                s.background(t.text_muted())
-                    .hover(|s| s.background(t.text_muted()))
-            })
-        });
+        .with_theme(|s, t| s.background(t.primary_foreground()));
 
     let labeled_radio_button_style = Style::new()
+        .padding(0.0)
         .with_theme(move |s, t| {
-            s.col_gap(t.padding())
-                .padding(t.padding())
+            s.col_gap(t.def(|_| Length::Pt(8.0)))
                 .set(Selectable, false)
-                .border_radius(t.border_radius())
-                .hover(|s| s.background(t.def(|t| t.primary_muted().with_alpha(0.7))))
-                .active(|s| s.class(RadioButtonClass, |s| s.background(t.bg_elevated())))
-                .selected(|s| s.disabled(|s| s.color(t.bg_elevated())))
-                .disabled(|s| s.color(t.text_muted()).unset_cursor())
+                .color(t.foreground())
+                .disabled(|s| {
+                    s.set(Opacity, 0.5)
+                        .set(Cursor, Some(CursorStyle::NotAllowed))
+                })
         })
         .cursor(CursorStyle::Pointer)
         .class(RadioButtonClass, |s| s.focus_none())
         .transition(Background, Transition::linear(100.millis()))
-        .focus(|s| {
-            s.with_theme(|s, t| s.hover(|s| s.background(t.def(|t| t.primary().with_alpha(0.7)))))
-        });
+        .focus(|s| s.class(RadioButtonClass, |s| s.apply(focus_style())))
+        .apply(focus_style());
 
     let toggle_button_style = Style::new()
         .width(32.0)
@@ -1021,61 +1035,89 @@ pub(crate) fn default_theme(os_theme: winit::window::Theme) -> Style {
                             }),
                         )
                 })
-                .disabled(|s| s.set(Opacity, 0.5).unset_cursor())
+                .disabled(|s| {
+                    s.set(Opacity, 0.5)
+                        .set(Cursor, Some(CursorStyle::NotAllowed))
+                })
         })
         .flex_shrink(0.0)
         .border_radius(100.pct())
         .corner_smoothing(0.6)
         .set(ToggleButtonCircleRad, 8.0)
-        .set(ToggleButtonInset, 1.0)
+        .set(ToggleButtonInset, 0.0)
+        .set(ToggleButtonUncheckedInset, Some(0.0.into()))
+        .set(ToggleButtonCheckedInset, Some(2.0.into()))
         .cursor(CursorStyle::Pointer)
-        .transition(Background, Transition::linear(100.millis()))
+        .transition(Background, Transition::linear(150.millis()))
         .apply(focus_style());
 
     let input_style = Style::new()
         .height(32.0)
         .padding_horiz(10.0)
         .padding_vert(4.0)
-        .border_radius(18.0)
+        .border_radius(8.0)
+        .corner_smoothing(0.6)
         .border(1.0)
-        .border_color(Color::TRANSPARENT)
         .font_size(14.0)
         .with_theme(|s, t| {
-            s.background(t.input_muted())
+            s.background(t.input_background())
+                .border_color(t.input())
+                .color(t.foreground())
                 .set_context(
                     SelectionColor,
                     t.def(|t| Brush::Solid(t.primary_muted().with_alpha(0.5))),
                 )
                 .cursor_color(t.primary())
-                .disabled(|s| s.set(Opacity, 0.5).unset_cursor())
+                .disabled(|s| {
+                    s.background(t.input_disabled_background())
+                        .set(Opacity, 0.5)
+                        .unset_cursor()
+                })
         })
+        .transition(Background, Transition::linear(100.millis()))
         .apply(focus_style())
         .cursor(CursorStyle::Text);
 
     let tab_selector_style = Style::new()
+        .height(26.0)
+        .padding_horiz(6.0)
+        .padding_vert(2.0)
+        .border(1.0)
+        .border_radius(6.0)
+        .background(css::TRANSPARENT)
+        .border_color(css::TRANSPARENT)
         .custom_style_class(|s: LabelCustomStyle| s.selectable(false))
         .with_theme(|s, t| {
-            s.background(t.bg_base())
-                .padding(t.padding())
-                .color(t.text_muted())
-                .border_bottom(2.)
-                .disabled(|s| s.background(t.bg_disabled()).color(t.text_muted()))
-                .selected(|s| {
-                    s.background(t.bg_elevated())
-                        .color(t.text())
-                        .border_color(t.primary())
+            s.color(t.def(|t| t.foreground.with_alpha(if t.is_dark { 0.7 } else { 0.6 })))
+                .disabled(|s| {
+                    s.set(Opacity, 0.5)
+                        .set(Cursor, Some(CursorStyle::NotAllowed))
                 })
-                .hover(|s| s.background(t.bg_elevated()).color(t.text()))
+                .selected(|s| {
+                    s.background(t.background())
+                        .color(t.foreground())
+                        .border_color(t.def(|t| if t.is_dark { t.input } else { css::TRANSPARENT }))
+                        .set_context(
+                            BoxShadowProp,
+                            t.def(|_| {
+                                smallvec![
+                                    BoxShadow::new()
+                                        .color(Color::from_rgb8(0, 0, 0).with_alpha(0.08))
+                                        .v_offset(1.0)
+                                        .blur_radius(2.0)
+                                ]
+                            }),
+                        )
+                })
+                .hover(|s| s.color(t.foreground()))
         })
-        .border_color(Color::TRANSPARENT)
         .transition(Background, Transition::linear(100.millis()))
         .transition(Foreground, Transition::linear(100.millis()))
         .justify_center()
         .items_center()
         .text_clip()
         .selectable(false)
-        .apply(focus_style())
-        .apply(hover_style());
+        .apply(focus_style());
 
     // let item_unfocused_style = Style::new().with_theme(|s, t| {
     //     s.hover(|s| s.background(t.bg_elevated())).selected(|s| {
@@ -1173,66 +1215,145 @@ pub(crate) fn default_theme(os_theme: winit::window::Theme) -> Style {
                 .custom(|cs: SliderCustomStyle| {
                     cs.bar_radius(100.pct())
                         .accent_bar_radius(100.pct())
-                        .handle_radius(100.pct())
-                        .edge_align(true)
+                        .bar_height(4.0)
+                        .accent_bar_height(4.0)
+                        .handle_radius(6.0)
+                        .edge_align(false)
                 })
+                .height(16.0)
                 .with_theme(|s, t| {
                     s.custom(|cs: SliderCustomExprStyle| {
-                        cs.bar_color(t.def(|t| Some(Brush::Solid(t.border()))))
+                        cs.bar_color(t.def(|t| Some(Brush::Solid(t.muted()))))
                             .accent_bar_color(t.def(|t| Brush::Solid(t.primary())))
-                            .handle_color(t.def(|t| Some(Brush::Solid(t.text()))))
+                            .handle_color(t.def(|_| Some(Brush::Solid(css::WHITE))))
                     })
+                    .disabled(|s| s.set(Opacity, 0.5).unset_cursor())
                 })
         })
         .class(PlaceholderTextClass, |s| {
             s.with_theme(|s, t| {
-                s.color(t.text_muted()).disabled(|s| {
-                    s.color(t.def(|t| t.text_muted().with_alpha(0.5)))
-                        .set(Background, Some(Brush::Solid(css::BLACK)))
-                })
+                s.color(t.text_muted())
+                    .disabled(|s| s.color(t.def(|t| t.text_muted().with_alpha(0.5))))
             })
         })
-        .class(TooltipClass, |s| s.apply(overlay_style()))
+        .class(TooltipClass, |s| {
+            s.padding_horiz(12.0)
+                .padding_vert(6.0)
+                .max_width(320.0)
+                .border(0.0)
+                .border_radius(6.0)
+                .corner_smoothing(0.6)
+                .font_size(12.0)
+                .line_height(1.0)
+                .selectable(false)
+                .with_theme(|s, t| s.background(t.foreground()).color(t.background()))
+        })
         .class(dropdown::DropdownClass, move |s| {
-            s.padding(3)
+            s.height(32.0)
+                .min_width(144.0)
+                .padding_left(10.0)
+                .padding_right(8.0)
+                .padding_vert(0.0)
+                .border(1.0)
+                .border_radius(8.0)
+                .corner_smoothing(0.6)
+                .font_size(14.0)
                 .apply(focus_style())
-                .apply(border_style(true))
+                .transition(Background, Transition::linear(100.millis()))
+                .transition(Foreground, Transition::linear(100.millis()))
+                .with_theme(|s, t| {
+                    s.background(t.input_background())
+                        .border_color(t.input())
+                        .color(t.foreground())
+                        .hover(|s| {
+                            s.background(t.def(|t| {
+                                if t.is_dark {
+                                    t.input.with_alpha(0.5)
+                                } else {
+                                    css::TRANSPARENT
+                                }
+                            }))
+                        })
+                        .disabled(|s| s.set(Opacity, 0.5).unset_cursor())
+                })
                 .selectable(false)
                 .class(dropdown::DropdownPreviewClass, |s| {
-                    s.gap(0.75.em()).class(SvgClass, |s| {
-                        s.with_theme(|s, t| {
-                            s.hover(|s| s.background(t.bg_elevated()))
-                                .border_radius(t.border_radius())
-                                .color(t.text())
+                    s.gap(6.0)
+                        .items_center()
+                        .justify_between()
+                        .class(SvgClass, |s| {
+                            s.with_theme(|s, t| {
+                                s.color(t.muted_foreground())
+                                    .hover(|s| s.color(t.muted_foreground()))
+                            })
+                            .padding(0.0)
+                            .size(16.0, 16.0)
+                            .flex_shrink(0.0)
                         })
-                        .padding(5.)
-                        .size(1.em(), 1.em())
-                    })
                 })
                 .class(scroll::ScrollClass, move |s| {
                     s.width_full()
-                        .scrollbar_width(0)
-                        .margin_top(3)
-                        .padding_vert(3)
-                        .apply(overlay_style())
+                        .max_height(256.0)
+                        .scrollbar_width(10.0)
+                        .margin_top(4.0)
+                        .padding(4.0)
+                        .border(1.0)
+                        .border_radius(8.0)
+                        .corner_smoothing(0.6)
+                        .with_theme(|s, t| {
+                            let shadow_color = Color::from_rgb8(0, 0, 0);
+                            s.background(t.popover())
+                                .color(t.popover_foreground())
+                                .border_color(t.def(|t| t.foreground.with_alpha(0.10)))
+                                .set_context(
+                                    BoxShadowProp,
+                                    t.def(move |theme| {
+                                        let opacity = if theme.is_dark { 0.5 } else { 0.14 };
+                                        smallvec![
+                                            BoxShadow::new()
+                                                .color(shadow_color.with_alpha(opacity))
+                                                .v_offset(4.0)
+                                                .blur_radius(10.0)
+                                                .spread(-1.0),
+                                            BoxShadow::new()
+                                                .color(shadow_color.with_alpha(opacity * 0.7))
+                                                .v_offset(2.0)
+                                                .blur_radius(4.0)
+                                                .spread(-2.0),
+                                        ]
+                                    }),
+                                )
+                        })
                         .items_center()
                         .class(ListItemClass, move |s| {
-                            s.padding(6).with_theme(|s, t| {
-                                s.hover(|s| {
-                                    s.background(t.bg_elevated())
-                                        .selected(|s| s.background(t.primary_muted()))
+                            s.min_height(28.0)
+                                .padding_horiz(6.0)
+                                .padding_vert(4.0)
+                                .border_radius(6.0)
+                                .font_size(14.0)
+                                .selectable(false)
+                                .transition(Background, Transition::linear(100.millis()))
+                                .transition(Foreground, Transition::linear(100.millis()))
+                                .with_theme(|s, t| {
+                                    s.color(t.popover_foreground())
+                                        .hover(|s| {
+                                            s.background(t.accent()).color(t.accent_foreground())
+                                        })
+                                        .selected(|s| {
+                                            s.background(t.accent()).color(t.accent_foreground())
+                                        })
+                                        .disabled(|s| s.set(Opacity, 0.5).unset_cursor())
                                 })
-                            })
                         })
                 })
         })
-        .class(ResizableClass, |s| s.padding_right(3))
+        .class(ResizableClass, |s| s.padding_right(1))
         .class(ResizableHandleClass, |s| {
-            s.custom(|cs: ResizableCustomStyle| cs.handle_thickness(3.))
+            s.custom(|cs: ResizableCustomStyle| cs.handle_thickness(1.))
                 .with_theme(|s, t| {
                     s.custom(|cs: ResizableCustomExprStyle| {
-                        cs.handle_color(t.def(|t| Brush::Solid(t.primary_muted().with_alpha(0.5))))
-                            .hover(|s| s.handle_color(t.def(|t| Brush::Solid(t.primary()))))
+                        cs.handle_color(t.def(|t| Brush::Solid(t.border())))
+                            .hover(|s| s.handle_color(t.def(|t| Brush::Solid(t.ring()))))
                     })
                 })
         })

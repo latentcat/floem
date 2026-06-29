@@ -19,7 +19,10 @@ enum AlertVariant {
 
 fn alert_icon(name: &'static str) -> AnyView {
     icon_library::icon(IconLibrary::Lucide, name)
-        .map(|icon| icon.style(|s| s.size(16.0, 16.0).flex_shrink(0.0)).into_any())
+        .map(|icon| {
+            icon.style(|s| s.size(16.0, 16.0).flex_shrink(0.0))
+                .into_any()
+        })
         .unwrap_or_else(|| Empty::new().style(|s| s.size(16.0, 16.0)).into_any())
 }
 

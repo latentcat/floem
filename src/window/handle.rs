@@ -1443,6 +1443,7 @@ impl WindowHandle {
             Some(CursorStyle::Pointer) => CursorIcon::Pointer,
             Some(CursorStyle::Progress) => CursorIcon::Progress,
             Some(CursorStyle::Wait) => CursorIcon::Wait,
+            Some(CursorStyle::NotAllowed) => CursorIcon::NotAllowed,
             Some(CursorStyle::Crosshair) => CursorIcon::Crosshair,
             Some(CursorStyle::Text) => CursorIcon::Text,
             Some(CursorStyle::Move) => CursorIcon::Move,

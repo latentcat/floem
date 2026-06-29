@@ -41,12 +41,14 @@ enum SliderUpdate {
 
 prop!(pub EdgeAlign: bool {} = false);
 prop!(pub HandleRadius: Length {} = Length::Pct(98.));
+prop!(pub SliderVertical: bool {} = false);
 
 prop_extractor! {
     SliderStyle {
         foreground: Foreground,
         handle_radius: HandleRadius,
         edge_align: EdgeAlign,
+        vertical: SliderVertical,
         font_size: FontSize,
         line_height: LineHeight,
     }
@@ -280,19 +282,25 @@ impl View for Slider {
             self.post_layout(new_layout);
         }
 
+        if self.id.is_disabled() {
+            return EventPropagation::Stop;
+        }
+
         let pos_changed = match &cx.event {
             Event::Pointer(PointerEvent::Down(PointerButtonEvent { state, pointer, .. })) => {
                 if let Some(pointer_id) = pointer.pointer_id {
                     cx.window_state.set_pointer_capture(pointer_id, self.id);
                 }
                 self.held = true;
-                self.update_state_from_mouse_pos(state.logical_point().x);
+                self.update_state_from_pointer_pos(self.pointer_axis_pos(state.logical_point()));
                 true
             }
             Event::Pointer(PointerEvent::Up(PointerButtonEvent { state, .. })) => {
                 let changed = self.held;
                 if self.held {
-                    self.update_state_from_mouse_pos(state.logical_point().x);
+                    self.update_state_from_pointer_pos(
+                        self.pointer_axis_pos(state.logical_point()),
+                    );
                     self.clamp_percent();
                 }
                 self.held = false;
@@ -300,11 +308,14 @@ impl View for Slider {
             }
             Event::Pointer(PointerEvent::Move(pu)) => {
                 if self.held {
-                    self.update_state_from_mouse_pos(pu.current.logical_point().x);
+                    self.update_state_from_pointer_pos(
+                        self.pointer_axis_pos(pu.current.logical_point()),
+                    );
                     true
                 } else {
                     // Dispatch hover event with state at current position
-                    let hover_state = self.state_from_mouse_pos(pu.current.logical_point().x);
+                    let hover_state = self
+                        .state_from_pointer_pos(self.pointer_axis_pos(pu.current.logical_point()));
                     self.id.route_event(
                         Event::new_custom(SliderHover { state: hover_state }),
                         crate::event::RouteKind::Directed {
@@ -324,11 +335,15 @@ impl View for Slider {
                 key,
                 ..
             }) => {
-                if *key == Key::Named(NamedKey::ArrowLeft) {
+                if *key == Key::Named(NamedKey::ArrowLeft)
+                    || (self.style.vertical() && *key == Key::Named(NamedKey::ArrowDown))
+                {
                     let new_percent = (self.state.pct.0 - 10.).clamp(0., 100.);
                     self.update_state_from_percent(new_percent);
                     true
-                } else if *key == Key::Named(NamedKey::ArrowRight) {
+                } else if *key == Key::Named(NamedKey::ArrowRight)
+                    || (self.style.vertical() && *key == Key::Named(NamedKey::ArrowUp))
+                {
                     let new_percent = (self.state.pct.0 + 10.).clamp(0., 100.);
                     self.update_state_from_percent(new_percent);
                     true
@@ -570,13 +585,32 @@ impl Slider {
     }
 
     fn handle_center_for_percent(&self, percent: f64) -> f64 {
-        let width = self.layout.new_box.size().width - self.handle.radius * 2.;
-        width * (percent / 100.) + self.handle.radius
+        let size = self.layout.new_box.size();
+        let length = if self.style.vertical() {
+            size.height
+        } else {
+            size.width
+        };
+        let available_length = length - self.handle.radius * 2.;
+        let offset = available_length * (percent / 100.) + self.handle.radius;
+        if self.style.vertical() {
+            length - offset
+        } else {
+            offset
+        }
     }
 
-    /// Update the slider state from a mouse position
-    fn update_state_from_mouse_pos(&mut self, mouse_x: f64) {
-        let percent = self.mouse_pos_to_percent(mouse_x);
+    fn pointer_axis_pos(&self, point: Point) -> f64 {
+        if self.style.vertical() {
+            point.y
+        } else {
+            point.x
+        }
+    }
+
+    /// Update the slider state from a pointer position on the active axis.
+    fn update_state_from_pointer_pos(&mut self, pointer_pos: f64) {
+        let percent = self.pointer_pos_to_percent(pointer_pos);
         self.update_state_from_percent(percent);
     }
 
@@ -590,9 +624,9 @@ impl Slider {
         );
     }
 
-    /// Create a slider state from a mouse position without updating self
-    fn state_from_mouse_pos(&self, mouse_x: f64) -> SliderState {
-        let percent = self.mouse_pos_to_percent(mouse_x);
+    /// Create a slider state from a pointer position without updating self.
+    fn state_from_pointer_pos(&self, pointer_pos: f64) -> SliderState {
+        let percent = self.pointer_pos_to_percent(pointer_pos);
         SliderState::from_percent(
             percent,
             &self.range,
@@ -607,54 +641,106 @@ impl Slider {
         let resolve_cx = self.style.length_resolve_cx();
 
         let circle_radius = self.calculate_handle_radius();
-        let width = size.width - circle_radius * 2.;
-        let center = width * (self.state.pct.0 / 100.) + circle_radius;
-        let circle_point = Point::new(center, size.height / 2.);
+        let center = self.handle_center_for_percent(self.state.pct.0);
+        let circle_point = if self.style.vertical() {
+            Point::new(size.width / 2., center)
+        } else {
+            Point::new(center, size.height / 2.)
+        };
         self.handle = crate::kurbo::Circle::new(circle_point, circle_radius);
 
-        let base_bar_height = self
+        let base_bar_thickness = self
             .base_bar_style
             .height()
-            .resolve(size.height, &resolve_cx)
-            .unwrap_or(size.height);
-        let accent_bar_height = self
+            .resolve(
+                if self.style.vertical() {
+                    size.width
+                } else {
+                    size.height
+                },
+                &resolve_cx,
+            )
+            .unwrap_or(if self.style.vertical() {
+                size.width
+            } else {
+                size.height
+            });
+        let accent_bar_thickness = self
             .accent_bar_style
             .height()
-            .resolve(size.height, &resolve_cx)
-            .unwrap_or(size.height);
+            .resolve(
+                if self.style.vertical() {
+                    size.width
+                } else {
+                    size.height
+                },
+                &resolve_cx,
+            )
+            .unwrap_or(if self.style.vertical() {
+                size.width
+            } else {
+                size.height
+            });
 
-        let base_bar_radii = border_radius(&self.base_bar_style, base_bar_height / 2., &resolve_cx);
-        let accent_bar_radii =
-            border_radius(&self.accent_bar_style, accent_bar_height / 2., &resolve_cx);
+        let base_bar_radii =
+            border_radius(&self.base_bar_style, base_bar_thickness / 2., &resolve_cx);
+        let accent_bar_radii = border_radius(
+            &self.accent_bar_style,
+            accent_bar_thickness / 2.,
+            &resolve_cx,
+        );
 
-        let mut base_bar_length = size.width;
+        let axis_length = if self.style.vertical() {
+            size.height
+        } else {
+            size.width
+        };
+        let mut base_bar_length = axis_length;
         if !self.style.edge_align() {
             base_bar_length -= self.handle.radius * 2.;
         }
 
-        let base_bar_y_start = size.height / 2. - base_bar_height / 2.;
-        let accent_bar_y_start = size.height / 2. - accent_bar_height / 2.;
-
-        let bar_x_start = if self.style.edge_align() {
+        let bar_axis_start = if self.style.edge_align() {
             0.
         } else {
             self.handle.radius
         };
-
-        self.base_bar = peniko::kurbo::Rect::new(
-            bar_x_start,
-            base_bar_y_start,
-            bar_x_start + base_bar_length,
-            base_bar_y_start + base_bar_height,
-        )
-        .to_rounded_rect(base_bar_radii);
-        self.accent_bar = peniko::kurbo::Rect::new(
-            bar_x_start,
-            accent_bar_y_start,
-            self.handle_center(),
-            accent_bar_y_start + accent_bar_height,
-        )
-        .to_rounded_rect(accent_bar_radii);
+        if self.style.vertical() {
+            let base_bar_x_start = size.width / 2. - base_bar_thickness / 2.;
+            let accent_bar_x_start = size.width / 2. - accent_bar_thickness / 2.;
+            let bar_bottom = bar_axis_start + base_bar_length;
+            self.base_bar = peniko::kurbo::Rect::new(
+                base_bar_x_start,
+                bar_axis_start,
+                base_bar_x_start + base_bar_thickness,
+                bar_bottom,
+            )
+            .to_rounded_rect(base_bar_radii);
+            self.accent_bar = peniko::kurbo::Rect::new(
+                accent_bar_x_start,
+                self.handle_center(),
+                accent_bar_x_start + accent_bar_thickness,
+                bar_bottom,
+            )
+            .to_rounded_rect(accent_bar_radii);
+        } else {
+            let base_bar_y_start = size.height / 2. - base_bar_thickness / 2.;
+            let accent_bar_y_start = size.height / 2. - accent_bar_thickness / 2.;
+            self.base_bar = peniko::kurbo::Rect::new(
+                bar_axis_start,
+                base_bar_y_start,
+                bar_axis_start + base_bar_length,
+                base_bar_y_start + base_bar_thickness,
+            )
+            .to_rounded_rect(base_bar_radii);
+            self.accent_bar = peniko::kurbo::Rect::new(
+                bar_axis_start,
+                accent_bar_y_start,
+                self.handle_center(),
+                accent_bar_y_start + accent_bar_thickness,
+            )
+            .to_rounded_rect(accent_bar_radii);
+        }
 
         self.prev_percent = self.state.pct.0;
         self.id.request_paint();
@@ -669,26 +755,35 @@ impl Slider {
             .resolve(basis, &self.style.length_resolve_cx())
     }
 
-    /// Convert mouse x position to percentage, taking handle radius into account
-    fn mouse_pos_to_percent(&self, mouse_x: f64) -> f64 {
+    /// Convert pointer position to percentage, taking handle radius into account.
+    fn pointer_pos_to_percent(&self, pointer_pos: f64) -> f64 {
         let size = self.layout.new_box.size();
-        if size.width == 0.0 {
+        let length = if self.style.vertical() {
+            size.height
+        } else {
+            size.width
+        };
+        if length == 0.0 {
             return 0.0;
         }
 
         let handle_radius = self.calculate_handle_radius();
 
         // Clamp mouse position to handle center bounds
-        let clamped_x = mouse_x.clamp(handle_radius, size.width - handle_radius);
+        let clamped_pos = pointer_pos.clamp(handle_radius, length - handle_radius);
 
         // Convert to percentage within the available range
-        let available_width = size.width - handle_radius * 2.;
-        if available_width <= 0.0 {
+        let available_length = length - handle_radius * 2.;
+        if available_length <= 0.0 {
             return 0.0;
         }
 
-        let relative_pos = clamped_x - handle_radius;
-        (relative_pos / available_width * 100.0).clamp(0.0, 100.0)
+        let relative_pos = if self.style.vertical() {
+            length - handle_radius - clamped_pos
+        } else {
+            clamped_pos - handle_radius
+        };
+        (relative_pos / available_length * 100.0).clamp(0.0, 100.0)
     }
 
     /// Sets the custom style properties of the `Slider`.
@@ -747,6 +842,12 @@ impl SliderCustomStyle {
     /// * `align` - A boolean value that determines the alignment of the handle. If `true`, the edges of the handle are within the bar at 0% and 100%. If `false`, the bars are shortened and the handle's center appears at the ends of the bar.
     pub fn edge_align(mut self, align: bool) -> Self {
         self = SliderCustomStyle(self.0.set(EdgeAlign, align));
+        self
+    }
+
+    /// Sets whether the slider is vertical.
+    pub fn vertical(mut self, vertical: bool) -> Self {
+        self = SliderCustomStyle(self.0.set(SliderVertical, vertical));
         self
     }
 
@@ -858,6 +959,18 @@ impl SliderCustomExprStyle {
         self = SliderCustomExprStyle(
             ExprStyle::from(self.0)
                 .set_context(EdgeAlign, align.map(Into::into))
+                .into(),
+        );
+        self
+    }
+
+    pub fn vertical<T>(mut self, vertical: ContextValue<T>) -> Self
+    where
+        T: Into<bool> + 'static,
+    {
+        self = SliderCustomExprStyle(
+            ExprStyle::from(self.0)
+                .set_context(SliderVertical, vertical.map(Into::into))
                 .into(),
         );
         self

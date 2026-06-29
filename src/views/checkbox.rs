@@ -23,10 +23,10 @@ style_class!(
 );
 
 /// The default checkbox SVG
-pub const DEFAULT_CHECKBOX_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -2 16 16"><polygon points="5.19,11.83 0.18,7.44 1.82,5.56 4.81,8.17 10,1.25 12,2.75" /></svg>"#;
+pub const DEFAULT_CHECKBOX_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>"#;
 
 fn checkbox_svg(
-    checked: impl SignalGet<bool> + 'static,
+    checked: impl SignalGet<bool> + Copy + 'static,
     check_svg: impl Into<String> + 'static,
 ) -> impl IntoView {
     let check_svg: String = check_svg.into();
@@ -40,7 +40,10 @@ fn checkbox_svg(
             }
         }
     };
-    svg(check_svg).update_value(update_svg).class(CheckboxClass)
+    svg(check_svg)
+        .update_value(update_svg)
+        .class(CheckboxClass)
+        .style(move |s| s.apply_if(checked.get(), |s| s.set_selected(true)))
 }
 
 /// # A customizable checkbox view for boolean selection.

@@ -1,48 +1,142 @@
-use floem::prelude::*;
+use floem::{
+    AnyView, IntoView,
+    prelude::*,
+    style::Style,
+    text::FontWeight,
+    theme::StyleThemeExt,
+    views::{CheckboxClass, Decorators},
+};
 
-use crate::form::{form, form_item};
-
-// Source: https://www.svgrepo.com/svg/509804/check | License: MIT
-const CUSTOM_CHECK_SVG: &str = r##"
-<svg width="800px" height="800px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path fill-rule="evenodd" clip-rule="evenodd" d="M20.6097 5.20743C21.0475 5.54416 21.1294 6.17201 20.7926 6.60976L10.7926 19.6098C10.6172 19.8378 10.352 19.9793 10.0648 19.9979C9.77765 20.0166 9.49637 19.9106 9.29289 19.7072L4.29289 14.7072C3.90237 14.3166 3.90237 13.6835 4.29289 13.2929C4.68342 12.9024 5.31658 12.9024 5.70711 13.2929L9.90178 17.4876L19.2074 5.39034C19.5441 4.95258 20.172 4.87069 20.6097 5.20743Z" fill="#000000"/>
-</svg>
-"##;
-
-// Source: https://www.svgrepo.com/svg/505349/cross | License: MIT
+// Kept public because the Lists gallery uses it for a custom checkbox example.
 pub const CROSS_SVG: &str = r##"
 <svg width="800px" height="800px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M19 5L5 19M5.00001 5L19 19" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M19 5L5 19M5.00001 5L19 19" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
 "##;
 
+fn title(text: &'static str) -> impl IntoView {
+    text.style(|s| {
+        s.font_size(14.0)
+            .font_weight(FontWeight::SEMI_BOLD)
+            .with_theme(|s, t| s.color(t.foreground()))
+    })
+}
+
+fn description(text: &'static str) -> impl IntoView {
+    text.style(|s| {
+        s.font_size(13.0)
+            .line_height(1.35)
+            .with_theme(|s, t| s.color(t.muted_foreground()))
+    })
+}
+
+fn field(control: impl IntoView + 'static, label: &'static str, detail: &'static str) -> AnyView {
+    Stack::horizontal((
+        control,
+        Stack::vertical((title(label), description(detail))).style(|s| s.flex_col().gap(3.0)),
+    ))
+    .style(|s| s.items_start().gap(8.0))
+    .into_any()
+}
+
+fn section(title_text: &'static str, content: impl IntoView + 'static) -> AnyView {
+    Stack::vertical((title(title_text), content))
+        .style(|s| s.flex_col().gap(12.0))
+        .into_any()
+}
+
+fn invalid_checkbox_style() -> Style {
+    Style::new().with_theme(|s, t| {
+        s.border_color(t.danger())
+            .outline(3.0)
+            .outline_color(t.def(|t| t.danger().with_alpha(if t.is_dark { 0.4 } else { 0.2 })))
+            .selected(|s| s.border_color(t.primary()))
+    })
+}
+
 pub fn checkbox_view() -> impl IntoView {
-    // let width = 160.0;
-    let is_checked = RwSignal::new(true);
-    form((
-        form_item("Checkbox:", Checkbox::new_rw(is_checked)),
-        form_item(
-            "Custom Checkbox 1:",
-            Checkbox::new_rw_custom(is_checked, CUSTOM_CHECK_SVG)
-                .style(|s| s.color(palette::css::GREEN)),
+    let checked = RwSignal::new(true);
+    let unchecked = RwSignal::new(false);
+    let notifications = RwSignal::new(true);
+    let invalid_unchecked = RwSignal::new(false);
+    let invalid_checked = RwSignal::new(true);
+
+    let invalid_unchecked_control =
+        Checkbox::new_rw(invalid_unchecked).style(|s| s.apply(invalid_checkbox_style()));
+    let invalid_checked_control =
+        Checkbox::new_rw(invalid_checked).style(|s| s.apply(invalid_checkbox_style()));
+
+    Stack::vertical((
+        "Checkbox".style(|s| {
+            s.font_size(20.0)
+                .font_weight(FontWeight::SEMI_BOLD)
+                .with_theme(|s, t| s.color(t.foreground()))
+        }),
+        section(
+            "States",
+            Stack::horizontal((
+                field(
+                    Checkbox::new_rw(unchecked),
+                    "Unchecked",
+                    "Default empty state with input border.",
+                ),
+                field(
+                    Checkbox::new_rw(checked),
+                    "Checked",
+                    "Primary background and foreground check.",
+                ),
+                field(
+                    checkbox(|| false).style(|s| s.set_disabled(true)),
+                    "Disabled",
+                    "Reduced opacity and disabled cursor.",
+                ),
+                field(
+                    checkbox(|| true).style(|s| s.set_disabled(true)),
+                    "Disabled checked",
+                    "Checked state keeps primary fill while disabled.",
+                ),
+            ))
+            .style(|s| s.flex_col().gap(14.0)),
         ),
-        form_item(
-            "Disabled Checkbox:",
-            checkbox(move || is_checked.get()).style(|s| s.set_disabled(true)),
+        section(
+            "Validation",
+            Stack::vertical((
+                field(
+                    invalid_unchecked_control,
+                    "Invalid unchecked",
+                    "Destructive border and ring on an unchecked control.",
+                ),
+                field(
+                    invalid_checked_control,
+                    "Invalid checked",
+                    "Checked invalid keeps the primary border and fill.",
+                ),
+            ))
+            .style(|s| {
+                s.flex_col()
+                    .gap(14.0)
+                    .class(CheckboxClass, |s| s.flex_shrink(0.0))
+            }),
         ),
-        form_item(
-            "Labeled Checkbox:",
-            Checkbox::labeled_rw(is_checked, || "Check me!"),
-        ),
-        form_item(
-            "Custom Checkbox 2:",
-            Checkbox::custom_labeled_rw(is_checked, move || "Custom Check Mark", CROSS_SVG)
-                .style(|s| s.class(CheckboxClass, |s| s.color(palette::css::RED))),
-        ),
-        form_item(
-            "Disabled Labeled Checkbox:",
-            labeled_checkbox(move || is_checked.get(), || "Check me!")
-                .style(|s| s.set_disabled(true)),
+        section(
+            "Field",
+            Stack::vertical((field(
+                Checkbox::labeled_rw(notifications, || "Enable notifications"),
+                "Label composition",
+                "The label row uses shadcn spacing without a separate card surface.",
+            ),))
+            .style(|s| {
+                s.flex_col()
+                    .gap(14.0)
+                    .class(CheckboxClass, |s| s.flex_shrink(0.0))
+            }),
         ),
     ))
+    .style(|s| {
+        s.flex_col()
+            .gap(24.0)
+            .padding(30.0)
+            .max_width(720.0)
+            .with_theme(|s, t| s.background(t.background()).color(t.foreground()))
+    })
 }

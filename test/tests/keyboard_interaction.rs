@@ -8,7 +8,8 @@
 use floem::event::Event;
 use floem::peniko::Brush;
 use floem::prelude::*;
-use floem::style::{Background, StyleSelector};
+use floem::style::{Background, Cursor, CursorStyle, StyleSelector};
+use floem::views::ToggleButton;
 use floem_test::prelude::*;
 use ui_events::keyboard::{Code, Key, KeyState, KeyboardEvent, Location, Modifiers};
 
@@ -42,6 +43,31 @@ fn test_focus_style_applied_when_focused() {
         matches!(bg, Some(Brush::Solid(c)) if c == palette::css::YELLOW),
         "Focus style should be applied, got {:?}",
         bg
+    );
+}
+
+#[test]
+fn test_disabled_toggle_button_does_not_toggle() {
+    let root = TestRoot::new();
+    let checked = RwSignal::new(false);
+
+    let view = ToggleButton::new_rw(checked).style(|s| s.set_disabled(true));
+    let id = view.view_id();
+
+    let mut harness = HeadlessHarness::new_with_size(root, view, 100.0, 100.0);
+
+    assert!(id.is_disabled(), "Toggle button should be disabled");
+    assert!(!checked.get(), "Toggle should start unchecked");
+
+    harness.click(16.0, 9.0);
+
+    assert!(!checked.get(), "Disabled toggle should ignore clicks");
+
+    let style = harness.get_computed_style(id);
+    assert_eq!(
+        style.get(Cursor),
+        Some(CursorStyle::NotAllowed),
+        "Disabled toggle should use shadcn-style not-allowed cursor"
     );
 }
 

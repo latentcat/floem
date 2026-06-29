@@ -14,18 +14,29 @@ style_class!(pub RadioButtonDotClass);
 style_class!(pub RadioButtonDotSelectedClass);
 style_class!(pub LabeledRadioButtonClass);
 
-fn radio_button_svg<T>(represented_value: T, actual_value: impl SignalGet<T> + 'static) -> impl View
+fn radio_button_svg<T>(
+    represented_value: T,
+    actual_value: impl SignalGet<T> + Copy + 'static,
+) -> impl View
 where
     T: Eq + PartialEq + Clone + 'static,
 {
+    let dot_value = represented_value.clone();
+    let selected_value = represented_value.clone();
+
     ().class(RadioButtonDotClass)
         .style(move |s| {
-            s.apply_if(actual_value.get() != represented_value, |s| {
+            s.apply_if(actual_value.get() != dot_value, |s| {
                 s.display(taffy::style::Display::None)
             })
         })
         .container()
         .class(RadioButtonClass)
+        .style(move |s| {
+            s.apply_if(actual_value.get() == selected_value, |s| {
+                s.set_selected(true)
+            })
+        })
 }
 
 /// The `RadioButton` struct provides various methods to create and manage radio buttons.
